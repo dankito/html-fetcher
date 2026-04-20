@@ -54,6 +54,7 @@ class CurlCffiClient:
         timeout: Optional[float],
         user_agent: Optional[str],
         follow_redirects: bool,
+        cookies: Optional[dict[str, str]] = None,
     ) -> FetchResult:
         headers = {
             **_BASE_HEADERS,
@@ -67,6 +68,7 @@ class CurlCffiClient:
                 headers=headers,
                 timeout=timeout,
                 allow_redirects=follow_redirects,
+                cookies=cookies or {},
             )
 
         logger.info(

@@ -17,6 +17,14 @@ class FetchRequest(BaseModel):
         default=True,
         description="Whether to follow HTTP redirects.",
     )
+    cookies: Optional[dict[str, str]] = Field(
+        default=None,
+        description=(
+            "Cookies to send with the request. "
+            "Useful for passing pre-solved bot-detection cookies such as 'datadome'. "
+            "Example: {\"datadome\": \"<token>\"}"
+        ),
+    )
 
 
 class FetchResponse(BaseModel):

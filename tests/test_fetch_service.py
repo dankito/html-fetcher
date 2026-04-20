@@ -57,6 +57,7 @@ class TestFetchServiceEscalation:
             timeout=10.0,
             user_agent="TestAgent/1.0",
             follow_redirects=False,
+            cookies=None,
         )
 
     async def test_passes_parameters_through_to_playwright_on_escalation(
@@ -74,6 +75,7 @@ class TestFetchServiceEscalation:
             timeout=5.0,
             user_agent="Bot/2.0",
             follow_redirects=True,
+            cookies=None,
         )
 
     async def test_html_content_is_returned(self, service, mock_curl_client):

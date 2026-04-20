@@ -40,11 +40,13 @@ class FetchService:
         timeout: Optional[float] = None,
         user_agent: Optional[str] = None,
         follow_redirects: bool = True,
+        cookies: Optional[dict[str, str]] = None,
     ) -> FetchResult:
         kwargs = dict(
             timeout=timeout,
             user_agent=user_agent,
             follow_redirects=follow_redirects,
+            cookies=cookies,
         )
 
         # --- Tier 1: curl_cffi ---

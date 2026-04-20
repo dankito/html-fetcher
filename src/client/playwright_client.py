@@ -106,6 +106,7 @@ class PlaywrightClient:
         timeout: Optional[float],
         user_agent: Optional[str],
         follow_redirects: bool,
+        cookies: Optional[dict[str, str]] = None,
     ) -> FetchResult:
         if self._browser is None:
             raise RuntimeError("PlaywrightClient not started; call start() first")
@@ -127,6 +128,17 @@ class PlaywrightClient:
             java_script_enabled=True,
         )
         try:
+            # Playwright accepts cookies as a list of dicts with required fields.
+            # We parse the target URL to scope cookies to the correct domain.
+            if cookies:
+                from urllib.parse import urlparse
+                parsed = urlparse(url)
+                domain = parsed.hostname or parsed.netloc
+                await context.add_cookies([
+                    {"name": k, "value": v, "domain": domain, "path": "/"}
+                    for k, v in cookies.items()
+                ])
+
             page = await context.new_page()
             await page.add_init_script(_STEALTH_SCRIPT)
 
