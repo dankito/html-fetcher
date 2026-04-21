@@ -5,8 +5,8 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import HTMLResponse, JSONResponse
 from pydantic import HttpUrl
 
-from src.model.fetch_result import FetchResult
-from src.api.dto.fetch_dto import FetchRequest, FetchResponse
+from src.model.fetch_result import FetchResult, FetchStrategy
+from src.api.dto.fetch_dto import FetchRequest, FetchResponse, parse_strategy_value
 from src.service.fetch_service import FetchService
 
 logger = logging.getLogger(__name__)
@@ -36,6 +36,7 @@ async def fetch_get_html(
     user_agent: Optional[str] = Query(default=None),
     follow_redirects: bool = Query(default=True),
     cookies: Optional[list[str]] = Query(default=None, description="Cookies as 'name:value' pairs"),
+    strategies: Optional[list[str]] = Query( default=None, description="Overwrite the default order ('curl-cffi,camoufox') which fetch strategies to use like 'camoufox'"),
     service: FetchService = Depends(_get_service),
 ) -> HTMLResponse:
     request = FetchRequest(
@@ -44,6 +45,7 @@ async def fetch_get_html(
         user_agent=user_agent,
         follow_redirects=follow_redirects,
         cookies=_parse_cookie_pairs(cookies),
+        strategies=_parse_strategies(strategies),
     )
     result = await _do_fetch(service, request)
     return _to_html_response(result)
@@ -62,6 +64,7 @@ async def fetch_get_json(
     user_agent: Optional[str] = Query(default=None),
     follow_redirects: bool = Query(default=True),
     cookies: Optional[list[str]] = Query(default=None, description="Cookies as 'name:value' pairs"),
+    strategies: Optional[list[str]] = Query( default=None, description="Overwrite the default order ('curl-cffi,camoufox') which fetch strategies to use like 'camoufox'"),
     service: FetchService = Depends(_get_service),
 ) -> FetchResponse:
     request = FetchRequest(
@@ -70,6 +73,7 @@ async def fetch_get_json(
         user_agent=user_agent,
         follow_redirects=follow_redirects,
         cookies=_parse_cookie_pairs(cookies),
+        strategies=_parse_strategies(strategies),
     )
     result = await _do_fetch(service, request)
     return _to_fetch_response(result)
@@ -125,6 +129,22 @@ def _parse_cookie_pairs(pairs: Optional[list[str]]) -> Optional[dict[str, str]]:
         result[name.strip()] = value.strip()
     return result or None
 
+
+def _parse_strategies(strategies: Optional[list[str]]) -> Optional[list[FetchStrategy]]:
+    """Parse strategy strings (case-insensitive, handle '-' vs '_', 'curl' shortcut)."""
+    if not strategies:
+        return None
+    result = []
+    for s in strategies:
+        for part in s.split(","):
+            part = part.strip()
+            if not part:
+                continue
+            try:
+                result.append(parse_strategy_value(part))
+            except ValueError as e:
+                raise HTTPException(status_code=422, detail=str(e))
+    return result if result else None
 
 
 # ---------------------------------------------------------------------------

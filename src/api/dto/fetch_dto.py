@@ -1,6 +1,7 @@
-from pydantic import BaseModel, HttpUrl, Field, computed_field
-from typing import Optional
+from pydantic import BaseModel, HttpUrl, Field, computed_field, field_validator
+from typing import Optional, Union
 
+from src.model.fetch_result import FetchStrategy
 
 class FetchRequest(BaseModel):
     url: HttpUrl
@@ -25,6 +26,27 @@ class FetchRequest(BaseModel):
             'Example: {"datadome": "<token>"}'
         ),
     )
+    strategies: Optional[list[FetchStrategy]] = Field(
+        default=None,
+        description=(
+            "Custom fetch strategies to use in order. "
+            "If not provided, uses the default order (curl_cffi then camoufox). "
+            "Valid: curl, curl-cffi, curl_cffi, camoufox (all case-insensitive; curl is a shortcut for curl_cffi). "
+            'Example: ["camoufox", "curl"]'
+        ),
+    )
+
+    @field_validator("strategies", mode="before")
+    @classmethod
+    def parse_strategies(
+        cls, v: Optional[Union[str, list[str]]]
+    ) -> Optional[list[FetchStrategy]]:
+        if v is None:
+            return None
+        if isinstance(v, str):
+            v = [v]
+        result = [parse_strategy_value(s) for s in v]
+        return result if result else None
 
     @computed_field
     @property
@@ -37,3 +59,13 @@ class FetchResponse(BaseModel):
     status_code: int
     final_url: str
     strategy: str
+
+
+
+def parse_strategy_value(value: str) -> FetchStrategy:
+    normalized = value.lower().replace("-", "_").replace(" ", "_")
+    if normalized == "curl" or normalized == "curl_cffi":
+        return FetchStrategy.CURL_CFFI
+    elif normalized == "camoufox":
+        return FetchStrategy.CAMOUFOX
+    raise ValueError(f"Invalid strategy '{value}'. Valid: curl, curl-cffi, curl_cffi, camoufox (all case-insensitive; curl is a shortcut for curl_cffi)")
