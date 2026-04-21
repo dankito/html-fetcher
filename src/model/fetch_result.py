@@ -4,7 +4,6 @@ from enum import Enum
 
 class FetchStrategy(str, Enum):
     CURL_CFFI = "curl_cffi"
-    PLAYWRIGHT = "playwright"
     CAMOUFOX = "camoufox"
 
 
