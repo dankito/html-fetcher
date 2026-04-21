@@ -2,6 +2,7 @@ import logging
 
 from src.api.dto.fetch_dto import FetchRequest
 from src.client.curl_cffi_client import CurlCffiClient
+from src.client.html_fetcher import HtmlFetcher
 from src.client.playwright_client import PlaywrightClient
 from src.model.fetch_result import FetchResult
 
@@ -12,7 +13,7 @@ logger = logging.getLogger(__name__)
 _REJECTION_CODES = {403, 401, 407, 429}
 
 
-class FetchService:
+class FetchService(HtmlFetcher):
     """
     Implements a two-tier fetch strategy:
 

@@ -3,6 +3,7 @@ import logging
 from curl_cffi.requests import AsyncSession
 
 from src.api.dto.fetch_dto import FetchRequest
+from src.client.html_fetcher import HtmlFetcher
 from src.model.fetch_result import FetchResult, FetchStrategy
 
 logger = logging.getLogger(__name__)
@@ -40,7 +41,7 @@ _BASE_HEADERS = {
 }
 
 
-class CurlCffiClient:
+class CurlCffiClient(HtmlFetcher):
     """
     HTTP client backed by curl_cffi.
     Impersonates Chrome's TLS + HTTP/2 fingerprint, which defeats

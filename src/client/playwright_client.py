@@ -4,6 +4,7 @@ import os
 from playwright.async_api import async_playwright
 
 from src.api.dto.fetch_dto import FetchRequest
+from src.client.html_fetcher import HtmlFetcher
 from src.model.fetch_result import FetchResult, FetchStrategy
 
 logger = logging.getLogger(__name__)
@@ -56,7 +57,7 @@ _STEALTH_SCRIPT = """
 """
 
 
-class PlaywrightClient:
+class PlaywrightClient(HtmlFetcher):
     """
     Last-resort client that drives a real headless Chromium browser.
 
