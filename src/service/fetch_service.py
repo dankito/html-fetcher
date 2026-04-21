@@ -34,8 +34,6 @@ class FetchService:
         self._playwright = playwright_client
 
     async def fetch(self, request: FetchRequest) -> FetchResult:
-        url = str(request.url)
-
         # --- Tier 1: curl_cffi ---
         try:
             result = await self._curl.fetch(request)
@@ -44,12 +42,12 @@ class FetchService:
             logger.warning(
                 "curl_cffi got rejection status %d for %s; escalating to Playwright",
                 result.status_code,
-                url,
+                request.url_str,
             )
         except Exception as exc:
             logger.warning(
                 "curl_cffi failed for %s (%s); escalating to Playwright",
-                url,
+                request.url_str,
                 exc,
             )
 

@@ -48,7 +48,6 @@ class CurlCffiClient:
     """
 
     async def fetch(self, request: FetchRequest) -> FetchResult:
-        url = str(request.url)
         headers = {
             **_BASE_HEADERS,
             "User-Agent": request.user_agent or _DEFAULT_USER_AGENT,
@@ -56,7 +55,7 @@ class CurlCffiClient:
 
         async with AsyncSession(impersonate="chrome131") as session:
             response = await session.get(
-                url,
+                request.url_str,
                 headers=headers,
                 timeout=request.timeout,
                 allow_redirects=request.follow_redirects,
@@ -65,7 +64,7 @@ class CurlCffiClient:
 
         logger.info(
             "curl_cffi fetched %s -> status=%d final_url=%s",
-            url,
+            request.url_str,
             response.status_code,
             response.url,
         )

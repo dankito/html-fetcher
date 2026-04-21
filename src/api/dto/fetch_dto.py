@@ -1,9 +1,9 @@
-from pydantic import BaseModel, HttpUrl, Field
-from typing import Optional, Union
+from pydantic import BaseModel, HttpUrl, Field, computed_field
+from typing import Optional
 
 
 class FetchRequest(BaseModel):
-    url: Union[str, HttpUrl]
+    url: HttpUrl
     timeout: Optional[float] = Field(
         default=None,
         description="Timeout in seconds. Unset means no timeout.",
@@ -25,6 +25,11 @@ class FetchRequest(BaseModel):
             'Example: {"datadome": "<token>"}'
         ),
     )
+
+    @computed_field
+    @property
+    def url_str(self) -> str:
+        return str(self.url)
 
 
 class FetchResponse(BaseModel):

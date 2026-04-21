@@ -103,7 +103,6 @@ class PlaywrightClient:
         if self._browser is None:
             raise RuntimeError("PlaywrightClient not started; call start() first")
 
-        url = str(request.url)
         # playwright timeout is in milliseconds; None → 0 means no timeout
         pw_timeout = (request.timeout * 1000) if request.timeout is not None else 0
 
@@ -126,7 +125,7 @@ class PlaywrightClient:
             if request.cookies:
                 from urllib.parse import urlparse
 
-                parsed = urlparse(url)
+                parsed = urlparse(request.url_str)
                 domain = parsed.hostname or parsed.netloc
                 await context.add_cookies([
                     {"name": k, "value": v, "domain": domain, "path": "/"}
@@ -147,7 +146,7 @@ class PlaywrightClient:
                 pass
 
             response = await page.goto(
-                url,
+                request.url_str,
                 wait_until="networkidle",
                 timeout=pw_timeout,
             )
@@ -160,7 +159,7 @@ class PlaywrightClient:
 
         logger.info(
             "playwright fetched %s -> status=%d final_url=%s",
-            url,
+            request.url_str,
             status_code,
             final_url,
         )
