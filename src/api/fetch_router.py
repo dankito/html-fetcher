@@ -3,6 +3,7 @@ from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import HTMLResponse, JSONResponse
+from pydantic import HttpUrl
 
 from src.api.dto.fetch_dto import FetchRequest, FetchResponse
 from src.service.fetch_service import FetchService
@@ -29,7 +30,7 @@ def _get_service() -> FetchService:
     operation_id="fetch_html_get",
 )
 async def fetch_get_html(
-    url: str = Query(...),
+    url: HttpUrl = Query(...),
     timeout: Optional[float] = Query(default=None, gt=0),
     user_agent: Optional[str] = Query(default=None),
     follow_redirects: bool = Query(default=True),
@@ -55,7 +56,7 @@ async def fetch_get_html(
     operation_id="fetch_json_get",
 )
 async def fetch_get_json(
-    url: str = Query(...),
+    url: HttpUrl = Query(...),
     timeout: Optional[float] = Query(default=None, gt=0),
     user_agent: Optional[str] = Query(default=None),
     follow_redirects: bool = Query(default=True),
