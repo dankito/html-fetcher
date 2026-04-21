@@ -4,12 +4,13 @@ Unit tests for FetchService — no network calls, everything mocked.
 
 import pytest
 from unittest.mock import AsyncMock
+from pydantic import HttpUrl
 
 from src.api.dto.fetch_dto import FetchRequest
 from src.model.fetch_result import FetchStrategy
 from tests.conftest import make_result
 
-URL = "https://www.reisereporter.de/reiseziele/europa/deutschland/bayern/geheimtipps-fuer-bayern-diese-ausflugsziele-sind-nicht-ueberlaufen-YWCKDMYKDVI5LI7GGKVIY3DWRU.html"
+URL = HttpUrl("https://www.reisereporter.de/reiseziele/europa/deutschland/bayern/geheimtipps-fuer-bayern-diese-ausflugsziele-sind-nicht-ueberlaufen-YWCKDMYKDVI5LI7GGKVIY3DWRU.html")
 
 
 class TestFetchServiceEscalation:

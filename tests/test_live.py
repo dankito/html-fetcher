@@ -7,7 +7,9 @@ Run with:
 Skipped in normal CI runs (no -m live flag).
 """
 import pytest
+from pydantic import HttpUrl
 
+from src.api.dto.fetch_dto import FetchRequest
 from src.client.curl_cffi_client import CurlCffiClient
 from src.client.playwright_client import PlaywrightClient
 from src.service.fetch_service import FetchService
@@ -42,7 +44,7 @@ async def live_service():
 @pytest.mark.live
 @pytest.mark.parametrize("url", EASY_URLS)
 async def test_easy_url_succeeds_with_curl(url, live_service):
-    result = await live_service.fetch(url, timeout=15.0)
+    result = await live_service.fetch(_request(url))
 
     assert result.status_code == 200
     assert len(result.html) > 100
@@ -57,7 +59,7 @@ async def test_protected_url_returns_html(url, live_service):
     bot-challenge page. We check for a meaningful content length and the
     absence of known DataDome / bot-wall markers.
     """
-    result = await live_service.fetch(url, timeout=30.0)
+    result = await live_service.fetch(_request(url))
 
     assert result.status_code == 200, (
         f"Expected 200 but got {result.status_code}. "
@@ -78,7 +80,7 @@ async def test_protected_url_returns_html(url, live_service):
 async def test_reisereporter_contains_article_content(live_service):
     """Spot-check that the actual article body is present in the fetched HTML."""
     url = PROTECTED_URLS[0]
-    result = await live_service.fetch(url, timeout=30.0)
+    result = await live_service.fetch(_request(url))
 
     html_lower = result.html.lower()
     # The article is about Bavarian day-trip destinations — these words should appear.
@@ -91,7 +93,7 @@ async def test_reisereporter_contains_article_content(live_service):
 @pytest.mark.live
 async def test_redirect_is_followed_and_final_url_captured(live_service):
     # http:// → https:// redirect
-    result = await live_service.fetch("http://example.com", timeout=15.0)
+    result = await live_service.fetch(_request("http://example.com"))
 
     assert result.status_code == 200
     assert result.final_url.startswith("https://")
@@ -101,4 +103,11 @@ async def test_redirect_is_followed_and_final_url_captured(live_service):
 async def test_timeout_is_respected(live_service):
     """A very short timeout should raise rather than hang."""
     with pytest.raises(Exception):
-        await live_service.fetch("https://httpbin.org/delay/5", timeout=1.0)
+        await live_service.fetch(_request("https://httpbin.org/delay/5", timeout=1.0))
+
+
+def _request(url: str | HttpUrl, timeout: float = 15.0) -> FetchRequest:
+    return FetchRequest(
+        url=url if isinstance(url, HttpUrl) else HttpUrl(url),
+        timeout=timeout,
+    )
