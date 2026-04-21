@@ -4,8 +4,8 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 
 from src.api.fetch_router import router as fetch_router, _get_service
+from src.client.camoufox_html_fetcher import CamoufoxHtmlFetcher
 from src.client.curl_cffi_client import CurlCffiClient
-from src.client.playwright_client import PlaywrightClient
 from src.service.fetch_service import FetchService
 
 logging.basicConfig(
@@ -19,10 +19,10 @@ logger = logging.getLogger(__name__)
 async def lifespan(app: FastAPI):
     # --- Startup ---
     curl_client = CurlCffiClient()
-    playwright_client = PlaywrightClient()
-    await playwright_client.start()
+    camoufox_html_fetcher = CamoufoxHtmlFetcher()
+    await camoufox_html_fetcher.start(headless=True)
 
-    service = FetchService(curl_client, playwright_client)
+    service = FetchService(curl_client, camoufox_html_fetcher)
 
     # Wire the service into the dependency injection system.
     app.dependency_overrides[_get_service] = lambda: service
@@ -31,7 +31,7 @@ async def lifespan(app: FastAPI):
     yield
 
     # --- Shutdown ---
-    await playwright_client.stop()
+    await camoufox_html_fetcher.stop()
     logger.info("html-fetcher service stopped")
 
 
@@ -40,7 +40,7 @@ app = FastAPI(
     description=(
         "Fetches a URL's HTML using a two-tier strategy: "
         "curl_cffi (Chrome TLS impersonation) first, "
-        "Playwright headless browser as last resort."
+        "Camoufox headless/headed browser as last resort."
     ),
     version="0.1.0",
     lifespan=lifespan,

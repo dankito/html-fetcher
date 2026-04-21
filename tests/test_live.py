@@ -10,13 +10,13 @@ import pytest
 from pydantic import HttpUrl
 
 from src.api.dto.fetch_dto import FetchRequest
+from src.client.camoufox_html_fetcher import CamoufoxHtmlFetcher
 from src.client.curl_cffi_client import CurlCffiClient
-from src.client.playwright_client import PlaywrightClient
 from src.service.fetch_service import FetchService
 from src.model.fetch_result import FetchStrategy
 
 # -----------------------------------------------------------------
-# Sites that should pass curl_cffi (no Playwright needed)
+# Sites that should pass curl_cffi (no Camoufox needed)
 # -----------------------------------------------------------------
 EASY_URLS = [
     "https://example.com",
@@ -24,7 +24,7 @@ EASY_URLS = [
 ]
 
 # -----------------------------------------------------------------
-# Sites protected by DataDome or similar — may need Playwright
+# Sites protected by DataDome or similar — may need Camoufox
 # -----------------------------------------------------------------
 PROTECTED_URLS = [
     "https://www.reisereporter.de/reiseziele/europa/deutschland/bayern/geheimtipps-fuer-bayern-diese-ausflugsziele-sind-nicht-ueberlaufen-YWCKDMYKDVI5LI7GGKVIY3DWRU.html",
@@ -34,11 +34,12 @@ PROTECTED_URLS = [
 @pytest.fixture(scope="module")
 async def live_service():
     curl_client = CurlCffiClient()
-    pw_client = PlaywrightClient()
-    await pw_client.start()
-    svc = FetchService(curl_client, pw_client)
+    camoufox = CamoufoxHtmlFetcher()
+    await camoufox.start(headless=True)
+    await camoufox.start()
+    svc = FetchService(curl_client, camoufox)
     yield svc
-    await pw_client.stop()
+    await camoufox.stop()
 
 
 @pytest.mark.live

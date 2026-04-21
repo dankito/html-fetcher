@@ -1,7 +1,7 @@
 import pytest
 from unittest.mock import AsyncMock, MagicMock
+from src.client.camoufox_html_fetcher import CamoufoxHtmlFetcher
 from src.client.curl_cffi_client import CurlCffiClient
-from src.client.playwright_client import PlaywrightClient
 from src.service.fetch_service import FetchService
 from src.model.fetch_result import FetchResult, FetchStrategy
 
@@ -12,13 +12,15 @@ def mock_curl_client() -> CurlCffiClient:
 
 
 @pytest.fixture
-def mock_playwright_client() -> PlaywrightClient:
-    return MagicMock(spec=PlaywrightClient)
+def mock_camoufox_html_fetcher() -> CamoufoxHtmlFetcher:
+    return MagicMock(spec=CamoufoxHtmlFetcher)
 
 
 @pytest.fixture
-def service(mock_curl_client, mock_playwright_client) -> FetchService:
-    return FetchService(mock_curl_client, mock_playwright_client)
+def service(
+    mock_curl_client, mock_camoufox_html_fetcher
+) -> FetchService:
+    return FetchService(mock_curl_client, mock_camoufox_html_fetcher)
 
 
 def make_result(

@@ -10,12 +10,14 @@ from src.api.dto.fetch_dto import FetchRequest
 from src.model.fetch_result import FetchStrategy
 from tests.conftest import make_result
 
-URL = HttpUrl("https://www.reisereporter.de/reiseziele/europa/deutschland/bayern/geheimtipps-fuer-bayern-diese-ausflugsziele-sind-nicht-ueberlaufen-YWCKDMYKDVI5LI7GGKVIY3DWRU.html")
+URL = HttpUrl(
+    "https://www.reisereporter.de/reiseziele/europa/deutschland/bayern/geheimtipps-fuer-bayern-diese-ausflugsziele-sind-nicht-ueberlaufen-YWCKDMYKDVI5LI7GGKVIY3DWRU.html"
+)
 
 
 class TestFetchServiceEscalation:
     async def test_returns_curl_result_on_200(
-        self, service, mock_curl_client, mock_playwright_client
+        self, service, mock_curl_client, mock_camoufox_html_fetcher
     ):
         mock_curl_client.fetch = AsyncMock(return_value=make_result(status_code=200))
         request = FetchRequest(url=URL)
@@ -23,37 +25,36 @@ class TestFetchServiceEscalation:
         result = await service.fetch(request)
 
         assert result.strategy == FetchStrategy.CURL_CFFI
-        mock_playwright_client.fetch.assert_not_called()
+        mock_camoufox_html_fetcher.fetch.assert_not_called()
 
     @pytest.mark.parametrize("rejection_code", [401, 403, 407, 429])
-    async def test_escalates_to_playwright_on_rejection_status(
-        self, rejection_code, service, mock_curl_client, mock_playwright_client
-    ):
+    async def test_escalates_to_camoufox_on_rejection_status(
+        self, rejection_code, service, mock_curl_client, mock_camoufox_html_fetcher,):
         mock_curl_client.fetch = AsyncMock(
             return_value=make_result(status_code=rejection_code)
         )
-        mock_playwright_client.fetch = AsyncMock(
-            return_value=make_result(status_code=200, strategy=FetchStrategy.PLAYWRIGHT)
+        mock_camoufox_html_fetcher.fetch = AsyncMock(
+            return_value=make_result(status_code=200, strategy=FetchStrategy.CAMOUFOX)
         )
         request = FetchRequest(url=URL)
 
         result = await service.fetch(request)
 
-        assert result.strategy == FetchStrategy.PLAYWRIGHT
-        mock_playwright_client.fetch.assert_called_once()
+        assert result.strategy == FetchStrategy.CAMOUFOX
+        mock_camoufox_html_fetcher.fetch.assert_called_once_with(request)
 
-    async def test_escalates_to_playwright_on_curl_exception(
-        self, service, mock_curl_client, mock_playwright_client
+    async def test_escalates_to_camoufox_on_curl_exception(
+        self, service, mock_curl_client, mock_camoufox_html_fetcher
     ):
         mock_curl_client.fetch = AsyncMock(side_effect=ConnectionError("TLS failure"))
-        mock_playwright_client.fetch = AsyncMock(
-            return_value=make_result(status_code=200, strategy=FetchStrategy.PLAYWRIGHT)
+        mock_camoufox_html_fetcher.fetch = AsyncMock(
+            return_value=make_result(status_code=200, strategy=FetchStrategy.CAMOUFOX)
         )
         request = FetchRequest(url=URL)
 
         result = await service.fetch(request)
 
-        assert result.strategy == FetchStrategy.PLAYWRIGHT
+        assert result.strategy == FetchStrategy.CAMOUFOX
 
     async def test_passes_parameters_through_to_curl(self, service, mock_curl_client):
         mock_curl_client.fetch = AsyncMock(return_value=make_result())
@@ -65,12 +66,12 @@ class TestFetchServiceEscalation:
 
         mock_curl_client.fetch.assert_called_once_with(request)
 
-    async def test_passes_parameters_through_to_playwright_on_escalation(
-        self, service, mock_curl_client, mock_playwright_client
+    async def test_passes_parameters_through_to_camoufox_on_escalation(
+        self, service, mock_curl_client, mock_camoufox_html_fetcher
     ):
         mock_curl_client.fetch = AsyncMock(return_value=make_result(status_code=403))
-        mock_playwright_client.fetch = AsyncMock(
-            return_value=make_result(status_code=200, strategy=FetchStrategy.PLAYWRIGHT)
+        mock_camoufox_html_fetcher.fetch = AsyncMock(
+            return_value=make_result(status_code=200, strategy=FetchStrategy.CAMOUFOX)
         )
         request = FetchRequest(
             url=URL, timeout=5.0, user_agent="Bot/2.0", follow_redirects=True
@@ -78,7 +79,7 @@ class TestFetchServiceEscalation:
 
         await service.fetch(request)
 
-        mock_playwright_client.fetch.assert_called_once_with(request)
+        mock_camoufox_html_fetcher.fetch.assert_called_once_with(request)
 
     async def test_html_content_is_returned(self, service, mock_curl_client):
         expected_html = "<html><body><h1>Geheimtipps Bayern</h1></body></html>"
