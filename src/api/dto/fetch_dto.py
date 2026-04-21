@@ -1,9 +1,9 @@
 from pydantic import BaseModel, HttpUrl, Field
-from typing import Optional
+from typing import Optional, Union
 
 
 class FetchRequest(BaseModel):
-    url: HttpUrl
+    url: Union[str, HttpUrl]
     timeout: Optional[float] = Field(
         default=None,
         description="Timeout in seconds. Unset means no timeout.",
@@ -22,7 +22,7 @@ class FetchRequest(BaseModel):
         description=(
             "Cookies to send with the request. "
             "Useful for passing pre-solved bot-detection cookies such as 'datadome'. "
-            "Example: {\"datadome\": \"<token>\"}"
+            'Example: {"datadome": "<token>"}'
         ),
     )
 

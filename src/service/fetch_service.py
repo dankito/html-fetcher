@@ -1,6 +1,6 @@
 import logging
-from typing import Optional
 
+from src.api.dto.fetch_dto import FetchRequest
 from src.client.curl_cffi_client import CurlCffiClient
 from src.client.playwright_client import PlaywrightClient
 from src.model.fetch_result import FetchResult
@@ -33,25 +33,12 @@ class FetchService:
         self._curl = curl_client
         self._playwright = playwright_client
 
-    async def fetch(
-        self,
-        url: str,
-        *,
-        timeout: Optional[float] = None,
-        user_agent: Optional[str] = None,
-        follow_redirects: bool = True,
-        cookies: Optional[dict[str, str]] = None,
-    ) -> FetchResult:
-        kwargs = dict(
-            timeout=timeout,
-            user_agent=user_agent,
-            follow_redirects=follow_redirects,
-            cookies=cookies,
-        )
+    async def fetch(self, request: FetchRequest) -> FetchResult:
+        url = str(request.url)
 
         # --- Tier 1: curl_cffi ---
         try:
-            result = await self._curl.fetch(url, **kwargs)
+            result = await self._curl.fetch(request)
             if result.status_code not in _REJECTION_CODES:
                 return result
             logger.warning(
@@ -67,4 +54,4 @@ class FetchService:
             )
 
         # --- Tier 2: Playwright ---
-        return await self._playwright.fetch(url, **kwargs)
+        return await self._playwright.fetch(request)

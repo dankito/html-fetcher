@@ -1,8 +1,8 @@
 import logging
-from typing import Optional
 
 from curl_cffi.requests import AsyncSession
 
+from src.api.dto.fetch_dto import FetchRequest
 from src.model.fetch_result import FetchResult, FetchStrategy
 
 logger = logging.getLogger(__name__)
@@ -33,7 +33,7 @@ _BASE_HEADERS = {
     "Sec-Ch-Ua-Platform": '"Linux"',
     "Sec-Fetch-Dest": "document",
     "Sec-Fetch-Mode": "navigate",
-    "Sec-Fetch-Site": "none",   # overridden per-request when Referer is set
+    "Sec-Fetch-Site": "none",  # overridden per-request when Referer is set
     "Sec-Fetch-User": "?1",
     "Sec-Gpc": "1",
     "Upgrade-Insecure-Requests": "1",
@@ -47,28 +47,20 @@ class CurlCffiClient:
     Cloudflare and similar WAF bot-detection at the transport layer.
     """
 
-    async def fetch(
-        self,
-        url: str,
-        *,
-        timeout: Optional[float],
-        user_agent: Optional[str],
-        follow_redirects: bool,
-        cookies: Optional[dict[str, str]] = None,
-    ) -> FetchResult:
+    async def fetch(self, request: FetchRequest) -> FetchResult:
+        url = str(request.url)
         headers = {
             **_BASE_HEADERS,
-            "User-Agent": user_agent or _DEFAULT_USER_AGENT,
+            "User-Agent": request.user_agent or _DEFAULT_USER_AGENT,
         }
 
-        # impersonate Chrome's exact TLS + HTTP/2 fingerprint
         async with AsyncSession(impersonate="chrome131") as session:
             response = await session.get(
                 url,
                 headers=headers,
-                timeout=timeout,
-                allow_redirects=follow_redirects,
-                cookies=cookies or {},
+                timeout=request.timeout,
+                allow_redirects=request.follow_redirects,
+                cookies=request.cookies or {},
             )
 
         logger.info(

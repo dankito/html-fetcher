@@ -1,9 +1,11 @@
 """
 Unit tests for FetchService — no network calls, everything mocked.
 """
+
 import pytest
 from unittest.mock import AsyncMock
 
+from src.api.dto.fetch_dto import FetchRequest
 from src.model.fetch_result import FetchStrategy
 from tests.conftest import make_result
 
@@ -11,10 +13,13 @@ URL = "https://www.reisereporter.de/reiseziele/europa/deutschland/bayern/geheimt
 
 
 class TestFetchServiceEscalation:
-    async def test_returns_curl_result_on_200(self, service, mock_curl_client, mock_playwright_client):
+    async def test_returns_curl_result_on_200(
+        self, service, mock_curl_client, mock_playwright_client
+    ):
         mock_curl_client.fetch = AsyncMock(return_value=make_result(status_code=200))
+        request = FetchRequest(url=URL)
 
-        result = await service.fetch(URL)
+        result = await service.fetch(request)
 
         assert result.strategy == FetchStrategy.CURL_CFFI
         mock_playwright_client.fetch.assert_not_called()
@@ -29,8 +34,9 @@ class TestFetchServiceEscalation:
         mock_playwright_client.fetch = AsyncMock(
             return_value=make_result(status_code=200, strategy=FetchStrategy.PLAYWRIGHT)
         )
+        request = FetchRequest(url=URL)
 
-        result = await service.fetch(URL)
+        result = await service.fetch(request)
 
         assert result.strategy == FetchStrategy.PLAYWRIGHT
         mock_playwright_client.fetch.assert_called_once()
@@ -42,23 +48,21 @@ class TestFetchServiceEscalation:
         mock_playwright_client.fetch = AsyncMock(
             return_value=make_result(status_code=200, strategy=FetchStrategy.PLAYWRIGHT)
         )
+        request = FetchRequest(url=URL)
 
-        result = await service.fetch(URL)
+        result = await service.fetch(request)
 
         assert result.strategy == FetchStrategy.PLAYWRIGHT
 
     async def test_passes_parameters_through_to_curl(self, service, mock_curl_client):
         mock_curl_client.fetch = AsyncMock(return_value=make_result())
-
-        await service.fetch(URL, timeout=10.0, user_agent="TestAgent/1.0", follow_redirects=False)
-
-        mock_curl_client.fetch.assert_called_once_with(
-            URL,
-            timeout=10.0,
-            user_agent="TestAgent/1.0",
-            follow_redirects=False,
-            cookies=None,
+        request = FetchRequest(
+            url=URL, timeout=10.0, user_agent="TestAgent/1.0", follow_redirects=False
         )
+
+        await service.fetch(request)
+
+        mock_curl_client.fetch.assert_called_once_with(request)
 
     async def test_passes_parameters_through_to_playwright_on_escalation(
         self, service, mock_curl_client, mock_playwright_client
@@ -67,31 +71,32 @@ class TestFetchServiceEscalation:
         mock_playwright_client.fetch = AsyncMock(
             return_value=make_result(status_code=200, strategy=FetchStrategy.PLAYWRIGHT)
         )
-
-        await service.fetch(URL, timeout=5.0, user_agent="Bot/2.0", follow_redirects=True)
-
-        mock_playwright_client.fetch.assert_called_once_with(
-            URL,
-            timeout=5.0,
-            user_agent="Bot/2.0",
-            follow_redirects=True,
-            cookies=None,
+        request = FetchRequest(
+            url=URL, timeout=5.0, user_agent="Bot/2.0", follow_redirects=True
         )
+
+        await service.fetch(request)
+
+        mock_playwright_client.fetch.assert_called_once_with(request)
 
     async def test_html_content_is_returned(self, service, mock_curl_client):
         expected_html = "<html><body><h1>Geheimtipps Bayern</h1></body></html>"
         mock_curl_client.fetch = AsyncMock(return_value=make_result(html=expected_html))
+        request = FetchRequest(url=URL)
 
-        result = await service.fetch(URL)
+        result = await service.fetch(request)
 
         assert result.html == expected_html
 
-    async def test_final_url_after_redirect_is_preserved(self, service, mock_curl_client):
+    async def test_final_url_after_redirect_is_preserved(
+        self, service, mock_curl_client
+    ):
         redirected_to = "https://www.reisereporter.de/canonical-url"
         mock_curl_client.fetch = AsyncMock(
             return_value=make_result(final_url=redirected_to)
         )
+        request = FetchRequest(url=URL)
 
-        result = await service.fetch(URL)
+        result = await service.fetch(request)
 
         assert result.final_url == redirected_to

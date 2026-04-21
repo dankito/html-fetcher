@@ -1,9 +1,9 @@
 import logging
 import os
-from typing import Optional
 
 from playwright.async_api import async_playwright
 
+from src.api.dto.fetch_dto import FetchRequest
 from src.model.fetch_result import FetchResult, FetchStrategy
 
 logger = logging.getLogger(__name__)
@@ -99,23 +99,16 @@ class PlaywrightClient:
             await self._playwright.stop()
         logger.info("Playwright browser stopped")
 
-    async def fetch(
-        self,
-        url: str,
-        *,
-        timeout: Optional[float],
-        user_agent: Optional[str],
-        follow_redirects: bool,
-        cookies: Optional[dict[str, str]] = None,
-    ) -> FetchResult:
+    async def fetch(self, request: FetchRequest) -> FetchResult:
         if self._browser is None:
             raise RuntimeError("PlaywrightClient not started; call start() first")
 
+        url = str(request.url)
         # playwright timeout is in milliseconds; None → 0 means no timeout
-        pw_timeout = (timeout * 1000) if timeout is not None else 0
+        pw_timeout = (request.timeout * 1000) if request.timeout is not None else 0
 
         context = await self._browser.new_context(
-            user_agent=user_agent or _DEFAULT_USER_AGENT,
+            user_agent=request.user_agent or _DEFAULT_USER_AGENT,
             extra_http_headers={
                 "Accept-Language": "en-US,en;q=0.7",
                 "Accept-Encoding": "gzip, deflate, br, zstd",
@@ -130,19 +123,20 @@ class PlaywrightClient:
         try:
             # Playwright accepts cookies as a list of dicts with required fields.
             # We parse the target URL to scope cookies to the correct domain.
-            if cookies:
+            if request.cookies:
                 from urllib.parse import urlparse
+
                 parsed = urlparse(url)
                 domain = parsed.hostname or parsed.netloc
                 await context.add_cookies([
                     {"name": k, "value": v, "domain": domain, "path": "/"}
-                    for k, v in cookies.items()
+                    for k, v in request.cookies.items()
                 ])
 
             page = await context.new_page()
             await page.add_init_script(_STEALTH_SCRIPT)
 
-            if not follow_redirects:
+            if not request.follow_redirects:
                 # Block all redirect responses so we stop at the first 3xx.
                 async def _abort_on_redirect(route, request):
                     await route.continue_()

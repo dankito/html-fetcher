@@ -36,7 +36,14 @@ async def fetch_get_html(
     cookies: Optional[list[str]] = Query(default=None, description="Cookies as 'name:value' pairs"),
     service: FetchService = Depends(_get_service),
 ) -> HTMLResponse:
-    result = await _do_fetch(service, url, timeout, user_agent, follow_redirects, _parse_cookie_pairs(cookies))
+    request = FetchRequest(
+        url=url,
+        timeout=timeout,
+        user_agent=user_agent,
+        follow_redirects=follow_redirects,
+        cookies=_parse_cookie_pairs(cookies),
+    )
+    result = await _do_fetch(service, request)
     return HTMLResponse(content=result.html)
 
 
@@ -55,7 +62,14 @@ async def fetch_get_json(
     cookies: Optional[list[str]] = Query(default=None, description="Cookies as 'name:value' pairs"),
     service: FetchService = Depends(_get_service),
 ) -> FetchResponse:
-    result = await _do_fetch(service, url, timeout, user_agent, follow_redirects, _parse_cookie_pairs(cookies))
+    request = FetchRequest(
+        url=url,
+        timeout=timeout,
+        user_agent=user_agent,
+        follow_redirects=follow_redirects,
+        cookies=_parse_cookie_pairs(cookies),
+    )
+    result = await _do_fetch(service, request)
     return FetchResponse(
         html=result.html,
         status_code=result.status_code,
@@ -80,7 +94,7 @@ async def fetch_post_html(
     body: FetchRequest,
     service: FetchService = Depends(_get_service),
 ) -> HTMLResponse:
-    result = await _do_fetch(service, str(body.url), body.timeout, body.user_agent, body.follow_redirects, body.cookies)
+    result = await _do_fetch(service, body)
     return HTMLResponse(content=result.html)
 
 
@@ -95,7 +109,7 @@ async def fetch_post_json(
     body: FetchRequest,
     service: FetchService = Depends(_get_service),
 ) -> FetchResponse:
-    result = await _do_fetch(service, str(body.url), body.timeout, body.user_agent, body.follow_redirects, body.cookies)
+    result = await _do_fetch(service, body)
     return FetchResponse(
         html=result.html,
         status_code=result.status_code,
@@ -124,22 +138,9 @@ def _parse_cookie_pairs(pairs: Optional[list[str]]) -> Optional[dict[str, str]]:
 # ---------------------------------------------------------------------------
 # Shared logic
 # ---------------------------------------------------------------------------
-async def _do_fetch(
-    service: FetchService,
-    url: str,
-    timeout: Optional[float],
-    user_agent: Optional[str],
-    follow_redirects: bool,
-    cookies: Optional[dict[str, str]],
-):
+async def _do_fetch(service: FetchService, request: FetchRequest):
     try:
-        return await service.fetch(
-            url,
-            timeout=timeout,
-            user_agent=user_agent,
-            follow_redirects=follow_redirects,
-            cookies=cookies,
-        )
+        return await service.fetch(request)
     except Exception as exc:
-        logger.exception("Fetch failed for %s", url)
+        logger.exception("Fetch failed for %s", request.url)
         raise HTTPException(status_code=502, detail=str(exc)) from exc
