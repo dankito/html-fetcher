@@ -5,6 +5,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import HTMLResponse, JSONResponse
 from pydantic import HttpUrl
 
+from src.model.fetch_result import FetchResult
 from src.api.dto.fetch_dto import FetchRequest, FetchResponse
 from src.service.fetch_service import FetchService
 
@@ -45,7 +46,7 @@ async def fetch_get_html(
         cookies=_parse_cookie_pairs(cookies),
     )
     result = await _do_fetch(service, request)
-    return HTMLResponse(content=result.html)
+    return _to_html_response(result)
 
 
 # returns the fetched HTML as JSON object of type FetchResponse
@@ -71,12 +72,7 @@ async def fetch_get_json(
         cookies=_parse_cookie_pairs(cookies),
     )
     result = await _do_fetch(service, request)
-    return FetchResponse(
-        html=result.html,
-        status_code=result.status_code,
-        final_url=result.final_url,
-        strategy=result.strategy.value,
-    )
+    return _to_fetch_response(result)
 
 
 # ---------------------------------------------------------------------------
@@ -96,7 +92,7 @@ async def fetch_post_html(
     service: FetchService = Depends(_get_service),
 ) -> HTMLResponse:
     result = await _do_fetch(service, body)
-    return HTMLResponse(content=result.html)
+    return _to_html_response(result)
 
 
 # returns the fetched HTML as JSON object of type FetchResponse
@@ -111,12 +107,7 @@ async def fetch_post_json(
     service: FetchService = Depends(_get_service),
 ) -> FetchResponse:
     result = await _do_fetch(service, body)
-    return FetchResponse(
-        html=result.html,
-        status_code=result.status_code,
-        final_url=result.final_url,
-        strategy=result.strategy.value,
-    )
+    return _to_fetch_response(result)
 
 
 # ---------------------------------------------------------------------------
@@ -145,3 +136,23 @@ async def _do_fetch(service: FetchService, request: FetchRequest):
     except Exception as exc:
         logger.exception("Fetch failed for %s", request.url)
         raise HTTPException(status_code=502, detail=str(exc)) from exc
+
+def _to_html_response(result: FetchResult) -> HTMLResponse:
+    return HTMLResponse(content=_inject_base_tag(result.html, result.final_url))
+
+def _to_fetch_response(result: FetchResult) -> FetchResponse:
+    return FetchResponse(
+        html=_inject_base_tag(result.html, result.final_url),
+        status_code=result.status_code,
+        final_url=result.final_url,
+        strategy=result.strategy.value,
+    )
+
+def _inject_base_tag(html: str, base_url: str) -> str:
+    """Inject <base href="base_url"> into <head> to fix relative URLs."""
+    base_tag = f'<base href="{base_url}">'
+    if "<head>" in html:
+        return html.replace("<head>", f"<head>{base_tag}", 1)
+    if "<html>" in html:
+        return html.replace("<html>", f"<html><head>{base_tag}</head>", 1)
+    return f"{base_tag}{html}"
