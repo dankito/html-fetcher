@@ -20,7 +20,7 @@ async def lifespan(app: FastAPI):
     # --- Startup ---
     curl_client = CurlCffiClient()
     camoufox_html_fetcher = CamoufoxHtmlFetcher()
-    await camoufox_html_fetcher.start(headless=True)
+    await camoufox_html_fetcher.start(headless=False)
 
     service = FetchService(curl_client, camoufox_html_fetcher)
 

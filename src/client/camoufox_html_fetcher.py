@@ -11,6 +11,12 @@ from src.model.fetch_result import FetchResult, FetchStrategy
 
 logger = logging.getLogger(__name__)
 
+# Hard cap used when the caller did not supply a timeout.
+# Without this, a bot-challenge page that never idles causes _goto_with_fallback
+# to retry indefinitely, each retry opening a new navigation (and in headed mode
+# a new visible window).
+_DEFAULT_TIMEOUT_MS = 30_000  # 30 s
+
 # Weighted OS distribution that mirrors real-world desktop market share.
 # Camoufox generates a coherent BrowserForge fingerprint per OS choice,
 # so rotating this prevents a static OS from becoming a detection signal.
@@ -86,7 +92,7 @@ class CamoufoxHtmlFetcher(HtmlFetcher):
             raise RuntimeError("CamoufoxHtmlFetcher not started; call start() first")
 
         # Camoufox timeout is in milliseconds; 0 means no timeout.
-        timeout = (request.timeout * 1000) if request.timeout is not None else None
+        timeout_ms = (request.timeout * 1000) if request.timeout is not None else _DEFAULT_TIMEOUT_MS
 
         context_kwargs: dict = {
             "viewport": {"width": 1920, "height": 1080},
@@ -115,7 +121,7 @@ class CamoufoxHtmlFetcher(HtmlFetcher):
             await asyncio.sleep(random.uniform(0.1, 0.6))
 
             # Strategy A: wait for full network idle (best for JS-rendered pages).
-            response = await _goto_with_fallback(page, request.url_str, timeout)
+            response = await _goto_with_fallback(page, request.url_str, timeout_ms)
 
             final_url = page.url
             status_code = response.status if response else 0
@@ -138,17 +144,20 @@ class CamoufoxHtmlFetcher(HtmlFetcher):
         )
 
 
-async def _goto_with_fallback(page, url: str, timeout: float | None):
+async def _goto_with_fallback(page, url: str, timeout_ms: float):
     """
     Try to navigate with 'networkidle' first (best for JS-heavy pages).
-    If that times out or raises, fall back to 'domcontentloaded' which
-    completes as soon as the DOM is parsed — good enough for SSR pages and
-    avoids hanging on sites with perpetual background XHR polling.
+    Falls back to 'domcontentloaded' ONLY on a non-timeout failure —
+    a TimeoutError means the page is genuinely stuck (e.g. a bot challenge
+    loop) and re-navigating would just open another cycle.
     """
+
     try:
-        return await page.goto(url, wait_until="networkidle", timeout=timeout if timeout is not None else 60)
+        return await page.goto(url, wait_until="networkidle", timeout=timeout_ms)
     except Exception as exc:
+        # Any other error (e.g. net::ERR_ABORTED): retry with a lighter
+        # wait condition which resolves as soon as the DOM is parsed.
         logger.warning(
             "networkidle timed out for %s (%s); retrying with domcontentloaded", url, exc
         )
-        return await page.goto(url, wait_until="domcontentloaded", timeout=timeout)
+        return await page.goto(url, wait_until="domcontentloaded", timeout=timeout_ms)
