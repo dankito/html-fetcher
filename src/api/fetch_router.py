@@ -1,7 +1,7 @@
 import logging
 from typing import Optional
 
-from fastapi import APIRouter, Depends, Header, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import HTMLResponse, JSONResponse
 
 from src.api.dto.fetch_dto import FetchRequest, FetchResponse
@@ -19,45 +19,88 @@ def _get_service() -> FetchService:
 # ---------------------------------------------------------------------------
 # GET  /fetch?url=...&timeout=...&user_agent=...&follow_redirects=...
 # ---------------------------------------------------------------------------
-@router.get("", summary="Fetch HTML (GET)")
-async def fetch_get(
-    url: str = Query(..., description="URL to fetch"),
-    timeout: Optional[float] = Query(
-        default=None, gt=0, description="Timeout in seconds (omit for no timeout)"
-    ),
-    user_agent: Optional[str] = Query(
-        default=None, description="Override User-Agent (omit to use built-in browser UA)"
-    ),
+
+# returns the fetched HTML directly
+@router.get(
+    "",
+    response_class=HTMLResponse,
+    responses={200: {"content": {"text/html": {}}, "description": "Raw HTML of the fetched page"}},
+    summary="Fetch HTML — returns raw HTML",
+    operation_id="fetch_html_get",
+)
+async def fetch_get_html(
+    url: str = Query(...),
+    timeout: Optional[float] = Query(default=None, gt=0),
+    user_agent: Optional[str] = Query(default=None),
     follow_redirects: bool = Query(default=True),
-    # Cookies as repeated query params: ?cookies=name:value&cookies=name2:value2
-    cookies: Optional[list[str]] = Query(
-        default=None,
-        description="Cookies as 'name:value' pairs. Repeat for multiple.",
-    ),
-    accept: Optional[str] = Header(default=None),
+    cookies: Optional[list[str]] = Query(default=None, description="Cookies as 'name:value' pairs"),
     service: FetchService = Depends(_get_service),
-):
-    parsed_cookies = _parse_cookie_pairs(cookies)
-    return await _do_fetch(service, url, timeout, user_agent, follow_redirects, parsed_cookies, accept)
+) -> HTMLResponse:
+    result = await _do_fetch(service, url, timeout, user_agent, follow_redirects, _parse_cookie_pairs(cookies))
+    return HTMLResponse(content=result.html)
+
+
+# returns the fetched HTML as JSON object of type FetchResponse
+@router.get(
+    "",
+    response_model=FetchResponse,
+    summary="Fetch HTML — returns JSON envelope",
+    operation_id="fetch_json_get",
+)
+async def fetch_get_json(
+    url: str = Query(...),
+    timeout: Optional[float] = Query(default=None, gt=0),
+    user_agent: Optional[str] = Query(default=None),
+    follow_redirects: bool = Query(default=True),
+    cookies: Optional[list[str]] = Query(default=None, description="Cookies as 'name:value' pairs"),
+    service: FetchService = Depends(_get_service),
+) -> FetchResponse:
+    result = await _do_fetch(service, url, timeout, user_agent, follow_redirects, _parse_cookie_pairs(cookies))
+    return FetchResponse(
+        html=result.html,
+        status_code=result.status_code,
+        final_url=result.final_url,
+        strategy=result.strategy.value,
+    )
 
 
 # ---------------------------------------------------------------------------
 # POST /fetch   body: FetchRequest JSON
 # ---------------------------------------------------------------------------
-@router.post("", summary="Fetch HTML (POST)")
-async def fetch_post(
+
+# returns the fetched HTML directly
+@router.post(
+    "",
+    response_class=HTMLResponse,
+    responses={200: {"content": {"text/html": {}}, "description": "Raw HTML of the fetched page"}},
+    summary="Fetch HTML — returns raw HTML",
+    operation_id="fetch_html",
+)
+async def fetch_post_html(
     body: FetchRequest,
-    accept: Optional[str] = Header(default=None),
     service: FetchService = Depends(_get_service),
-):
-    return await _do_fetch(
-        service,
-        str(body.url),
-        body.timeout,
-        body.user_agent,
-        body.follow_redirects,
-        body.cookies,
-        accept,
+) -> HTMLResponse:
+    result = await _do_fetch(service, str(body.url), body.timeout, body.user_agent, body.follow_redirects, body.cookies)
+    return HTMLResponse(content=result.html)
+
+
+# returns the fetched HTML as JSON object of type FetchResponse
+@router.post(
+    "",
+    response_model=FetchResponse,
+    summary="Fetch HTML — returns JSON envelope",
+    operation_id="fetch_json",
+)
+async def fetch_post_json(
+    body: FetchRequest,
+    service: FetchService = Depends(_get_service),
+) -> FetchResponse:
+    result = await _do_fetch(service, str(body.url), body.timeout, body.user_agent, body.follow_redirects, body.cookies)
+    return FetchResponse(
+        html=result.html,
+        status_code=result.status_code,
+        final_url=result.final_url,
+        strategy=result.strategy.value,
     )
 
 
@@ -69,12 +112,9 @@ def _parse_cookie_pairs(pairs: Optional[list[str]]) -> Optional[dict[str, str]]:
     if not pairs:
         return None
     result = {}
-    for pair in pairs:
+    for pair in (pairs or []):
         if ":" not in pair:
-            raise HTTPException(
-                status_code=422,
-                detail=f"Cookie '{pair}' must be in 'name:value' format",
-            )
+            raise HTTPException(status_code=422, detail=f"Cookie '{pair}' must be in 'name:value' format")
         name, _, value = pair.partition(":")
         result[name.strip()] = value.strip()
     return result or None
@@ -91,10 +131,9 @@ async def _do_fetch(
     user_agent: Optional[str],
     follow_redirects: bool,
     cookies: Optional[dict[str, str]],
-    accept: Optional[str],
 ):
     try:
-        result = await service.fetch(
+        return await service.fetch(
             url,
             timeout=timeout,
             user_agent=user_agent,
@@ -104,17 +143,3 @@ async def _do_fetch(
     except Exception as exc:
         logger.exception("Fetch failed for %s", url)
         raise HTTPException(status_code=502, detail=str(exc)) from exc
-
-    # Content negotiation: bare "text/html" accept → return raw HTML directly.
-    # Anything else (application/json, */*, unset) → return JSON envelope.
-    if accept and "text/html" in accept and "application/json" not in accept:
-        return HTMLResponse(content=result.html, status_code=200)
-
-    return JSONResponse(
-        content=FetchResponse(
-            html=result.html,
-            status_code=result.status_code,
-            final_url=result.final_url,
-            strategy=result.strategy.value,
-        ).model_dump()
-    )
