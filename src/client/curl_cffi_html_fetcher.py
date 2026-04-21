@@ -41,7 +41,7 @@ _BASE_HEADERS = {
 }
 
 
-class CurlCffiClient(HtmlFetcher):
+class CurlCffiHtmlFetcher(HtmlFetcher):
     """
     HTTP client backed by curl_cffi.
     Impersonates Chrome's TLS + HTTP/2 fingerprint, which defeats

@@ -2,7 +2,7 @@ import logging
 
 from src.api.dto.fetch_dto import FetchRequest
 from src.client.camoufox_html_fetcher import CamoufoxHtmlFetcher
-from src.client.curl_cffi_client import CurlCffiClient
+from src.client.curl_cffi_html_fetcher import CurlCffiHtmlFetcher
 from src.client.html_fetcher import HtmlFetcher
 from src.model.fetch_result import FetchResult
 
@@ -28,7 +28,7 @@ class FetchService(HtmlFetcher):
 
     def __init__(
         self,
-        curl_client: CurlCffiClient,
+        curl_client: CurlCffiHtmlFetcher,
         camoufox_html_fetcher: CamoufoxHtmlFetcher,
     ) -> None:
         self._curl = curl_client
