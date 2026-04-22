@@ -27,6 +27,7 @@ Anti-bot strategies used
 from __future__ import annotations
 
 import asyncio
+import os
 import random
 import logging
 from urllib.parse import urlparse
@@ -219,13 +220,20 @@ class ZendriverHtmlFetcher(HtmlFetcher):
 
     async def _launch_browser(self) -> zd.Browser:
         """Start a Chromium instance with stealth flags."""
+        
+        # Use ZENDRIVER_DATA_DIR for persistence if set
+        data_dir = os.environ.get("ZENDRIVER_DATA_DIR")
+        user_data_dir = os.path.join(data_dir, "user_data") if data_dir else None
+        
         config = zd.Config(
             headless=True,
             browser="brave", # other options: "chrome", "auto" (which is "chrome" on Linux)
             browser_args=_STEALTH_BROWSER_ARGS,
+            user_data_dir=user_data_dir,
             #lang="en-US", #seems to be a bug in zendriver that when setting it an exception gets thrown
         )
 
+        logger.info("Starting Zendriver browser with user_data_dir=%s", user_data_dir)
         return await zd.start(config=config)
 
     # ------------------------------------------------------------------

@@ -1,5 +1,6 @@
 import asyncio
 import logging
+import os
 import random
 from urllib.parse import urlparse
 
@@ -71,13 +72,19 @@ class CamoufoxHtmlFetcher(HtmlFetcher):
     async def start(self, headless: bool = True) -> None:
         target_os = _pick_os()
         self._headless = headless
+        
+        # Use CAMOUFOX_DATA_DIR for persistence if set
+        data_dir = os.environ.get("CAMOUFOX_DATA_DIR")
+        library_path = os.path.join(data_dir, "library") if data_dir else None
+        
         self._browser = await AsyncCamoufox(
             headless=headless,
             humanize=True,
             block_webrtc=True,
             os=target_os,
+            library_path=library_path,
         ).start()
-        logger.info("Camoufox browser ready (headless=%s, os=%s)", headless, target_os)
+        logger.info("Camoufox browser ready (headless=%s, os=%s, library_path=%s)", headless, target_os, library_path)
 
     async def stop(self) -> None:
         if self._browser:

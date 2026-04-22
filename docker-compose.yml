@@ -1,0 +1,18 @@
+services:
+  html-fetcher:
+    build: .
+    container_name: html-fetcher
+    restart: unless-stopped
+    ports:
+      - "3330:3330"
+    environment:
+      - HOST=0.0.0.0
+      - PORT=3330
+      - ROOT_PATH=/html-fetcher
+      - CAMOUFOX_DATA_DIR=/data/camoufox
+      - ZENDRIVER_DATA_DIR=/data/zendriver
+    volumes:
+      - html_fetcher_data:/data
+
+volumes:
+  html_fetcher_data:

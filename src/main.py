@@ -1,5 +1,6 @@
 import http
 import logging
+import os
 import time
 from contextlib import asynccontextmanager
 
@@ -10,6 +11,11 @@ from src.client.camoufox_html_fetcher import CamoufoxHtmlFetcher
 from src.client.curl_cffi_html_fetcher import CurlCffiHtmlFetcher
 from src.client.zendriver_html_fetcher import ZendriverHtmlFetcher
 from src.service.fetch_service import FetchService
+
+# ------------------------------------------------------------------
+# Configuration
+# ------------------------------------------------------------------
+ROOT_PATH = os.environ.get("ROOT_PATH", "")
 
 logging.basicConfig(
     level=logging.INFO,
@@ -32,7 +38,7 @@ async def lifespan(app: FastAPI):
     # Wire the service into the dependency injection system.
     app.dependency_overrides[_get_service] = lambda: service
 
-    logger.info("html-fetcher service ready")
+    logger.info("html-fetcher service ready (port=%d, root_path=%s)", PORT, ROOT_PATH)
     yield
 
     # --- Shutdown ---
@@ -50,6 +56,7 @@ app = FastAPI(
     ),
     version="0.1.0",
     lifespan=lifespan,
+    root_path=ROOT_PATH,
 )
 
 app.include_router(fetch_router)
