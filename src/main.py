@@ -17,6 +17,11 @@ from src.service.fetch_service import FetchService
 # ------------------------------------------------------------------
 PORT = int(os.environ.get("PORT", 3330))
 ROOT_PATH = os.environ.get("ROOT_PATH", "")
+USE_ZENDRIVER = os.environ.get("USE_ZENDRIVER", "1").lower() not in (
+    "0",
+    "false",
+    "no",
+)
 
 logging.basicConfig(
     level=logging.INFO,
@@ -31,8 +36,13 @@ async def lifespan(app: FastAPI):
     curl_client = CurlCffiHtmlFetcher()
     camoufox_html_fetcher = CamoufoxHtmlFetcher()
     await camoufox_html_fetcher.start(headless=True)
-    zendriver = ZendriverHtmlFetcher()
-    await zendriver.start()
+
+    zendriver = None
+    if USE_ZENDRIVER:
+        zendriver = ZendriverHtmlFetcher()
+        await zendriver.start()
+    else:
+        logger.info("Zendriver disabled via USE_ZENDRIVER")
 
     service = FetchService(curl_client, camoufox_html_fetcher, zendriver)
 
@@ -44,7 +54,8 @@ async def lifespan(app: FastAPI):
 
     # --- Shutdown ---
     await camoufox_html_fetcher.stop()
-    await zendriver.stop()
+    if zendriver:
+        await zendriver.stop()
     logger.info("html-fetcher service stopped")
 
 

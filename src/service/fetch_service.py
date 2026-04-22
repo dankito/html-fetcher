@@ -35,7 +35,7 @@ class FetchService(HtmlFetcher):
         self,
         curl_client: CurlCffiHtmlFetcher,
         camoufox_html_fetcher: CamoufoxHtmlFetcher,
-        zendriver_html_fetcher: ZendriverHtmlFetcher,
+        zendriver_html_fetcher: ZendriverHtmlFetcher | None = None,
     ) -> None:
         self._curl = curl_client
         self._camoufox = camoufox_html_fetcher
@@ -70,7 +70,10 @@ class FetchService(HtmlFetcher):
         except Exception as exc:
             logger.warning("Camoufox failed for %s (%s); escalating to Zendriver", request.url_str, exc)
 
-        # --- Tier 3: Zendriver ---
+        # --- Tier 3: Zendriver (if enabled) ---
+        if self._zendriver is None:
+            raise ValueError("Camoufox failed and Zendriver is disabled")
+
         return await self._zendriver.fetch(request)
 
     async def _fetch_with_custom_strategies_order(self, request: FetchRequest, strategies: list[FetchStrategy]) -> FetchResult:
@@ -81,6 +84,9 @@ class FetchService(HtmlFetcher):
                 elif strategy == FetchStrategy.CAMOUFOX:
                     result = await self._camoufox.fetch(request)
                 elif strategy == FetchStrategy.ZENDRIVER:
+                    if self._zendriver is None:
+                        logger.warning("Zendriver requested but disabled, skipping")
+                        continue
                     result = await self._zendriver.fetch(request)
                 else:
                     continue
