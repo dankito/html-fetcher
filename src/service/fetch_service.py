@@ -5,6 +5,7 @@ from src.client.camoufox_html_fetcher import CamoufoxHtmlFetcher
 from src.client.curl_cffi_html_fetcher import CurlCffiHtmlFetcher
 from src.client.html_fetcher import HtmlFetcher
 from src.client.zendriver_html_fetcher import ZendriverHtmlFetcher
+from src.model.app_config import AppConfig
 from src.model.fetch_result import FetchResult, FetchStrategy
 
 logger = logging.getLogger(__name__)
@@ -31,6 +32,21 @@ class FetchService(HtmlFetcher):
     Otherwise, uses the default order (curl_cffi, then camoufox).
     """
 
+    @classmethod
+    async def from_config(cls, config: AppConfig) -> "FetchService":
+        curl = CurlCffiHtmlFetcher()
+        camoufox = CamoufoxHtmlFetcher()
+        await camoufox.start(headless=True)
+
+        zendriver = None
+        if config.use_zendriver:
+            zendriver = ZendriverHtmlFetcher()
+            await zendriver.start()
+        else:
+            logger.info("Zendriver disabled via USE_ZENDRIVER")
+
+        return cls(curl, camoufox, zendriver)
+
     def __init__(
         self,
         curl_client: CurlCffiHtmlFetcher,
@@ -40,6 +56,12 @@ class FetchService(HtmlFetcher):
         self._curl = curl_client
         self._camoufox = camoufox_html_fetcher
         self._zendriver = zendriver_html_fetcher
+
+    async def stop(self) -> None:
+        await self._camoufox.stop()
+        if self._zendriver is not None:
+            await self._zendriver.stop()
+
 
     async def fetch(self, request: FetchRequest) -> FetchResult:
         if request.strategies is None or len(request.strategies) == 0:

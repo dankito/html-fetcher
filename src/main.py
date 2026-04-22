@@ -6,11 +6,9 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request, Response
 
 from src.api.fetch_router import router as fetch_router, _get_service
-from src.client.camoufox_html_fetcher import CamoufoxHtmlFetcher
-from src.client.curl_cffi_html_fetcher import CurlCffiHtmlFetcher
-from src.client.zendriver_html_fetcher import ZendriverHtmlFetcher
 from src.service.app_config_parser import AppConfigParser
 from src.service.fetch_service import FetchService
+
 
 logging.basicConfig(
     level=logging.INFO,
@@ -24,18 +22,7 @@ config = AppConfigParser().parse_app_config()
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # --- Startup ---
-    curl_client = CurlCffiHtmlFetcher()
-    camoufox_html_fetcher = CamoufoxHtmlFetcher()
-    await camoufox_html_fetcher.start(headless=True)
-
-    zendriver = None
-    if config.use_zendriver:
-        zendriver = ZendriverHtmlFetcher()
-        await zendriver.start()
-    else:
-        logger.info("Zendriver disabled via USE_ZENDRIVER")
-
-    service = FetchService(curl_client, camoufox_html_fetcher, zendriver)
+    service = await FetchService.from_config(config)
 
     # Wire the service into the dependency injection system.
     app.dependency_overrides[_get_service] = lambda: service
@@ -44,9 +31,7 @@ async def lifespan(app: FastAPI):
     yield
 
     # --- Shutdown ---
-    await camoufox_html_fetcher.stop()
-    if zendriver:
-        await zendriver.stop()
+    await service.stop()
     logger.info("html-fetcher service stopped")
 
 

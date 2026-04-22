@@ -10,10 +10,8 @@ import pytest
 from pydantic import HttpUrl
 
 from src.api.dto.fetch_dto import FetchRequest
-from src.client.camoufox_html_fetcher import CamoufoxHtmlFetcher
-from src.client.curl_cffi_html_fetcher import CurlCffiHtmlFetcher
-from src.client.zendriver_html_fetcher import ZendriverHtmlFetcher
 from src.service.fetch_service import FetchService
+from src.model.app_config import AppConfig
 from src.model.fetch_result import FetchStrategy
 
 # -----------------------------------------------------------------
@@ -34,17 +32,12 @@ PROTECTED_URLS = [
 
 @pytest.fixture(scope="module")
 async def live_service():
-    curl_client = CurlCffiHtmlFetcher()
-    camoufox = CamoufoxHtmlFetcher()
-    await camoufox.start(headless=True)
-    zendriver = ZendriverHtmlFetcher()
-    await zendriver.start()
+    config = AppConfig(use_zendriver=True)
 
-    svc = FetchService(curl_client, camoufox, zendriver)
-    yield svc
+    service = await FetchService.from_config(config)
+    yield service
 
-    await camoufox.stop()
-    await zendriver.stop()
+    await service.stop()
 
 
 @pytest.mark.live
