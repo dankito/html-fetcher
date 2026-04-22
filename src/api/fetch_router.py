@@ -39,7 +39,7 @@ async def fetch_get_html(
     user_agent: Optional[str] = Query(default=None),
     follow_redirects: bool = Query(default=True),
     cookies: Optional[list[str]] = Query(default=None, description="Cookies as 'name:value' pairs"),
-    strategies: Optional[list[str]] = Query( default=None, description="Overwrite the default order ('curl-cffi,camoufox') which fetch strategies to use like 'camoufox'"),
+    strategies: Optional[list[str]] = Query( default=None, description="Overwrite the default order ('curl-cffi,camoufox,zendriver') which fetch strategies to use like 'camoufox'"),
     service: FetchService = Depends(_get_service),
 ) -> HTMLResponse:
     request = FetchRequest(
@@ -67,7 +67,7 @@ async def fetch_get_json(
     user_agent: Optional[str] = Query(default=None),
     follow_redirects: bool = Query(default=True),
     cookies: Optional[list[str]] = Query(default=None, description="Cookies as 'name:value' pairs"),
-    strategies: Optional[list[str]] = Query( default=None, description="Overwrite the default order ('curl-cffi,camoufox') which fetch strategies to use like 'camoufox'"),
+    strategies: Optional[list[str]] = Query( default=None, description="Overwrite the default order ('curl-cffi,camoufox,zendriver') which fetch strategies to use like 'camoufox'"),
     service: FetchService = Depends(_get_service),
 ) -> FetchResponse:
     request = FetchRequest(

@@ -4,6 +4,7 @@ from src.api.dto.fetch_dto import FetchRequest
 from src.client.camoufox_html_fetcher import CamoufoxHtmlFetcher
 from src.client.curl_cffi_html_fetcher import CurlCffiHtmlFetcher
 from src.client.html_fetcher import HtmlFetcher
+from src.client.zendriver_html_fetcher import ZendriverHtmlFetcher
 from src.model.fetch_result import FetchResult, FetchStrategy
 
 logger = logging.getLogger(__name__)
@@ -34,9 +35,11 @@ class FetchService(HtmlFetcher):
         self,
         curl_client: CurlCffiHtmlFetcher,
         camoufox_html_fetcher: CamoufoxHtmlFetcher,
+        zendriver_html_fetcher: ZendriverHtmlFetcher,
     ) -> None:
         self._curl = curl_client
         self._camoufox = camoufox_html_fetcher
+        self._zendriver = zendriver_html_fetcher
 
     async def fetch(self, request: FetchRequest) -> FetchResult:
         if request.strategies is None or len(request.strategies) == 0:
@@ -52,20 +55,23 @@ class FetchService(HtmlFetcher):
             if result.status_code not in _REJECTION_CODES:
                 return result
 
-            logger.warning(
-                "curl_cffi got rejection status %d for %s; escalating to Camoufox",
-                result.status_code,
-                request.url_str,
-            )
+            logger.warning("curl_cffi got rejection status %d for %s; escalating to Camoufox", result.status_code, request.url_str)
         except Exception as exc:
-            logger.warning(
-                "curl_cffi failed for %s (%s); escalating to Camoufox",
-                request.url_str,
-                exc,
-            )
+            logger.warning("curl_cffi failed for %s (%s); escalating to Camoufox", request.url_str,
+                exc)
 
         # --- Tier 2: Camoufox ---
-        return await self._camoufox.fetch(request)
+        try:
+            result = await self._camoufox.fetch(request)
+            if result.status_code not in _REJECTION_CODES:
+                return result
+
+            logger.warning("Camoufox got rejection status %d for %s; escalating to Zendriver", result.status_code, request.url_str)
+        except Exception as exc:
+            logger.warning("Camoufox failed for %s (%s); escalating to Zendriver", request.url_str, exc)
+
+        # --- Tier 3: Zendriver ---
+        return await self._zendriver.fetch(request)
 
     async def _fetch_with_custom_strategies_order(self, request: FetchRequest, strategies: list[FetchStrategy]) -> FetchResult:
         for strategy in strategies:
@@ -74,6 +80,8 @@ class FetchService(HtmlFetcher):
                     result = await self._curl.fetch(request)
                 elif strategy == FetchStrategy.CAMOUFOX:
                     result = await self._camoufox.fetch(request)
+                elif strategy == FetchStrategy.ZENDRIVER:
+                    result = await self._zendriver.fetch(request)
                 else:
                     continue
 
@@ -87,7 +95,7 @@ class FetchService(HtmlFetcher):
                     request.url_str,
                 )
             except Exception as exc:
-                logger.warning(
+                logger.exception(
                     "%s failed for %s (%s); escalating to next strategy",
                     strategy.value,
                     request.url_str,

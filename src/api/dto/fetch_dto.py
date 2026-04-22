@@ -30,9 +30,9 @@ class FetchRequest(BaseModel):
         default=None,
         description=(
             "Custom fetch strategies to use in order. "
-            "If not provided, uses the default order (curl_cffi then camoufox). "
-            "Valid: curl, curl-cffi, curl_cffi, camoufox (all case-insensitive; curl is a shortcut for curl_cffi). "
-            'Example: ["camoufox", "curl"]'
+            "If not provided, uses the default order (curl_cffi -> camoufox -> zendriver). "
+            "Valid: curl, curl-cffi, curl_cffi, camoufox, zendriver (all case-insensitive; curl is a shortcut for curl_cffi). "
+            'Example: ["camoufox", "zendriver"]'
         ),
     )
 
@@ -68,4 +68,6 @@ def parse_strategy_value(value: str) -> FetchStrategy:
         return FetchStrategy.CURL_CFFI
     elif normalized == "camoufox":
         return FetchStrategy.CAMOUFOX
-    raise ValueError(f"Invalid strategy '{value}'. Valid: curl, curl-cffi, curl_cffi, camoufox (all case-insensitive; curl is a shortcut for curl_cffi)")
+    elif normalized == "zendriver":
+        return FetchStrategy.ZENDRIVER
+    raise ValueError(f"Invalid strategy '{value}'. Valid: curl, curl-cffi, curl_cffi, camoufox, zendriver (all case-insensitive; curl is a shortcut for curl_cffi)")

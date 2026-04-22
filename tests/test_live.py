@@ -12,6 +12,7 @@ from pydantic import HttpUrl
 from src.api.dto.fetch_dto import FetchRequest
 from src.client.camoufox_html_fetcher import CamoufoxHtmlFetcher
 from src.client.curl_cffi_html_fetcher import CurlCffiHtmlFetcher
+from src.client.zendriver_html_fetcher import ZendriverHtmlFetcher
 from src.service.fetch_service import FetchService
 from src.model.fetch_result import FetchStrategy
 
@@ -36,9 +37,11 @@ async def live_service():
     curl_client = CurlCffiHtmlFetcher()
     camoufox = CamoufoxHtmlFetcher()
     await camoufox.start(headless=True)
-    await camoufox.start()
-    svc = FetchService(curl_client, camoufox)
+    zendriver = ZendriverHtmlFetcher()
+
+    svc = FetchService(curl_client, camoufox, zendriver)
     yield svc
+
     await camoufox.stop()
 
 

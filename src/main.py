@@ -6,6 +6,7 @@ from fastapi import FastAPI
 from src.api.fetch_router import router as fetch_router, _get_service
 from src.client.camoufox_html_fetcher import CamoufoxHtmlFetcher
 from src.client.curl_cffi_html_fetcher import CurlCffiHtmlFetcher
+from src.client.zendriver_html_fetcher import ZendriverHtmlFetcher
 from src.service.fetch_service import FetchService
 
 logging.basicConfig(
@@ -20,9 +21,10 @@ async def lifespan(app: FastAPI):
     # --- Startup ---
     curl_client = CurlCffiHtmlFetcher()
     camoufox_html_fetcher = CamoufoxHtmlFetcher()
-    await camoufox_html_fetcher.start(headless=False)
+    await camoufox_html_fetcher.start(headless=True)
+    zendriver = ZendriverHtmlFetcher()
 
-    service = FetchService(curl_client, camoufox_html_fetcher)
+    service = FetchService(curl_client, camoufox_html_fetcher, zendriver)
 
     # Wire the service into the dependency injection system.
     app.dependency_overrides[_get_service] = lambda: service
