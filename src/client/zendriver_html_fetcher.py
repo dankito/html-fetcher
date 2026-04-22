@@ -259,7 +259,7 @@ class ZendriverHtmlFetcher(HtmlFetcher):
                 await tab.get(url)
                 # Brief human-like pause to let JS challenges settle
                 await self._human_simulation(tab)
-                if request.scroll_to_bottom:
+                if request.load_lazy_content:
                     await self._scroll_to_bottom(tab)
                 html = await tab.get_content()
 
@@ -413,7 +413,7 @@ class ZendriverHtmlFetcher(HtmlFetcher):
 
             await tab.get(url)
             await self._human_simulation(tab)
-            if request.scroll_to_bottom:
+            if request.load_lazy_content:
                 await self._scroll_to_bottom(tab)
             html = await tab.get_content()
 

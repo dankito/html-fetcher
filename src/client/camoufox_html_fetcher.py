@@ -126,7 +126,7 @@ class CamoufoxHtmlFetcher(HtmlFetcher):
             final_url = page.url
             status_code = response.status if response else 0
 
-            if request.scroll_to_bottom:
+            if request.load_lazy_content:
                 await self._scroll_to_bottom(page)
 
             html = await page.content()

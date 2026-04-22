@@ -36,7 +36,7 @@ class FetchRequest(BaseModel):
             'Example: ["camoufox", "zendriver"]'
         ),
     )
-    scroll_to_bottom: bool = Field(
+    load_lazy_content: bool = Field(
         default=False,
         description="Whether to scroll to the bottom before capturing HTML (resolves lazy-loaded elements).",
     )
