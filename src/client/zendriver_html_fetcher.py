@@ -53,7 +53,10 @@ _DEFAULT_UA = (
 _viewport_height = 1080
 
 # ---------------------------------------------------------------------------
-# Chrome launch flags that strip away common automation fingerprints
+# Only flags genuinely needed for headless/container operation.
+# Zendriver already handles all anti-detection flags internally.
+# Adding extra flags creates an unusual Chrome fingerprint that bot detectors
+# can identify – less is more here.
 # ---------------------------------------------------------------------------
 _STEALTH_BROWSER_ARGS = [
     # Original browser args:
@@ -82,72 +85,12 @@ _STEALTH_BROWSER_ARGS = [
     #     --remote-debugging-port=38787
     #     --webrtc-ip-handling-policy=disable_non_proxied_udp
     #     --force-webrtc-ip-handling-policy
-    "--no-sandbox",
+    "--no-sandbox",           # required when running as root (Docker / CI)
     "--disable-setuid-sandbox",
-    "--disable-dev-shm-usage",
-    # Remove the "Chrome is being controlled by automated software" banner
-    "--disable-infobars",
-    # Kill the automation extension entirely
-    "--disable-extensions",
-    "--disable-blink-features=AutomationControlled",
-    # Prevent Chrome from reporting crashes / metrics
-    "--disable-breakpad",
-    "--disable-client-side-phishing-detection",
-    "--disable-default-apps",
-    "--disable-hang-monitor",
-    "--disable-prompt-on-repost",
-    "--disable-sync",
-    "--disable-translate",
-    # Suppress "Save password" / other pop-ups
-    "--password-store=basic",
-    "--use-mock-keychain",
-    # Avoid GPU noise in headless/container environments
-    "--disable-gpu",
-    # Make window geometry look like a real laptop screen
-    f"--window-size=1920,{_viewport_height}",
-    "--start-maximized",
-    # Prevent WebRTC IP leaks (often fingerprinted)
-    "--disable-webrtc-hw-encoding",
-    "--disable-webrtc-hw-decoding",
-    "--enforce-webrtc-ip-permission-check",
+    "--disable-dev-shm-usage", # prevents crashes in low-/dev/shm environments
+    "--disable-gpu",           # avoids GPU errors in headless server environments
+    f"--window-size=1920,{_viewport_height}",  # realistic laptop viewport
 ]
-
-# ---------------------------------------------------------------------------
-# JS snippets injected before page scripts run to overwrite automation flags
-# ---------------------------------------------------------------------------
-_STEALTH_JS = """
-// Hide webdriver property
-Object.defineProperty(navigator, 'webdriver', {get: () => undefined});
-
-// Restore chrome runtime object that headless Chrome strips
-if (!window.chrome) {
-    window.chrome = {};
-}
-if (!window.chrome.runtime) {
-    window.chrome.runtime = {};
-}
-
-// Realistic plugin count (headless Chrome has 0)
-Object.defineProperty(navigator, 'plugins', {
-    get: () => {
-        const arr = [1, 2, 3, 4, 5];
-        arr.__proto__ = PluginArray.prototype;
-        return arr;
-    },
-});
-
-// Realistic language settings
-Object.defineProperty(navigator, 'languages', {
-    get: () => ['en-US', 'en'],
-});
-
-// Make permissions.query not expose automation
-const originalQuery = window.navigator.permissions.query;
-window.navigator.permissions.query = (parameters) =>
-    parameters.name === 'notifications'
-        ? Promise.resolve({state: Notification.permission})
-        : originalQuery(parameters);
-"""
 
 
 # avoids noisy zendriver logs
@@ -241,18 +184,15 @@ class ZendriverHtmlFetcher(HtmlFetcher):
         try:
             tab = await self._browser.get(url, new_tab=True)
 
-            # 1. Inject stealth JS overrides before any page script runs
-            await self._inject_stealth_scripts(tab)
-
-            # 2. Apply per-request User-Agent override
+            # 1. Apply per-request User-Agent override
             if request.user_agent:
                 await tab.set_user_agent(request.user_agent)
 
-            # 3. Inject cookies BEFORE navigation (e.g. DataDome token)
+            # 2. Inject cookies BEFORE navigation (e.g. DataDome token)
             if request.cookies:
                 await self._inject_cookies(self._browser, url, request.cookies)
 
-            # 4. Navigate – with or without redirect following
+            # 3. Navigate – with or without redirect following
             if not request.follow_redirects:
                 html = await self._fetch_no_redirect(tab, url, request)
             else:
@@ -287,22 +227,6 @@ class ZendriverHtmlFetcher(HtmlFetcher):
         )
 
         return await zd.start(config=config)
-
-    # ------------------------------------------------------------------
-    # Stealth JS injection
-    # ------------------------------------------------------------------
-
-    async def _inject_stealth_scripts(self, tab: zd.Tab) -> None:
-        """
-        Evaluate the stealth JS overrides in the page context.
-
-        We also use CDP ``Page.addScriptToEvaluateOnNewDocument`` so that the
-        patches survive navigations and are applied before any site script runs.
-        """
-        try:
-            await tab.send(cdp.page.add_script_to_evaluate_on_new_document(_STEALTH_JS))
-        except Exception as exc:
-            logger.debug("addScriptToEvaluateOnNewDocument failed: %s", exc)
 
     # ------------------------------------------------------------------
     # Cookie injection
