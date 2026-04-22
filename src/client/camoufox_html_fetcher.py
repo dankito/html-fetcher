@@ -65,9 +65,10 @@ class CamoufoxHtmlFetcher(HtmlFetcher):
        across requests.
     """
 
-    def __init__(self) -> None:
+    def __init__(self, viewportHeight: int = 1080) -> None:
         self._browser = None
         self._headless: bool = True
+        self._viewportHeight = viewportHeight
 
     async def start(self, headless: bool = True) -> None:
         target_os = _pick_os()
@@ -112,7 +113,7 @@ class CamoufoxHtmlFetcher(HtmlFetcher):
         timeout_ms = (request.timeout * 1000) if request.timeout is not None else _DEFAULT_TIMEOUT_MS
 
         context_kwargs: dict = {
-            "viewport": {"width": 1920, "height": 1080},
+            "viewport": {"width": 1920, "height": self._viewportHeight},
             "java_script_enabled": request.execute_javascript is not False,
         }
         # Honour a caller-supplied User-Agent by setting it as an extra header.
@@ -172,8 +173,6 @@ class CamoufoxHtmlFetcher(HtmlFetcher):
         the HTML is captured.
         """
         try:
-            viewport_height = 1080
-
             async def get_page_height():
                 return await page.evaluate("document.body.scrollHeight")
 
@@ -184,7 +183,7 @@ class CamoufoxHtmlFetcher(HtmlFetcher):
             current_pos = 0
 
             while current_pos < page_height:
-                current_pos = min(current_pos + viewport_height, page_height)
+                current_pos = min(current_pos + self._viewportHeight, page_height)
                 await page.evaluate(
                     f"window.scrollTo({{top: {current_pos}, left: 0, behavior: 'smooth'}});"
                 )
