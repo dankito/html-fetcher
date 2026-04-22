@@ -47,18 +47,20 @@ class FetchService(HtmlFetcher):
         else:
             return await self._fetch_with_custom_strategies_order(request, request.strategies)
 
+    def _should_skip_curl_cffi(self, request: FetchRequest) -> bool:
+        return request.execute_javascript is True
 
     async def _fetch_with_default_strategy(self, request: FetchRequest) -> FetchResult:
-        # --- Tier 1: curl_cffi ---
-        try:
-            result = await self._curl.fetch(request)
-            if result.status_code not in _REJECTION_CODES:
-                return result
+        # --- Tier 1: curl_cffi (if executing JavaScript is not required) ---
+        if not self._should_skip_curl_cffi(request):
+            try:
+                result = await self._curl.fetch(request)
+                if result.status_code not in _REJECTION_CODES:
+                    return result
 
-            logger.warning("curl_cffi got rejection status %d for %s; escalating to Camoufox", result.status_code, request.url_str)
-        except Exception as exc:
-            logger.warning("curl_cffi failed for %s (%s); escalating to Camoufox", request.url_str,
-                exc)
+                logger.warning("curl_cffi got rejection status %d for %s; escalating to Camoufox", result.status_code, request.url_str)
+            except Exception as exc:
+                logger.warning("curl_cffi failed for %s (%s); escalating to Camoufox", request.url_str, exc)
 
         # --- Tier 2: Camoufox ---
         try:
@@ -80,6 +82,9 @@ class FetchService(HtmlFetcher):
         for strategy in strategies:
             try:
                 if strategy == FetchStrategy.CURL_CFFI:
+                    if self._should_skip_curl_cffi(request):
+                        logger.warning("Skipping curl_cffi because execute_javascript=True")
+                        continue
                     result = await self._curl.fetch(request)
                 elif strategy == FetchStrategy.CAMOUFOX:
                     result = await self._camoufox.fetch(request)

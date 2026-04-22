@@ -187,6 +187,9 @@ class ZendriverHtmlFetcher(HtmlFetcher):
         try:
             tab = await self._browser.get(url, new_tab=True)
 
+            if request.execute_javascript is False:
+                await self._disable_javascript(tab)
+
             # 1. Apply per-request User-Agent override
             if request.user_agent:
                 await tab.set_user_agent(request.user_agent)
@@ -299,6 +302,20 @@ class ZendriverHtmlFetcher(HtmlFetcher):
                 pass
 
     # ------------------------------------------------------------------
+    # JavaScript control
+    # ------------------------------------------------------------------
+
+    async def _disable_javascript(self, tab: zd.Tab) -> None:
+        """
+        Disable JavaScript execution in the tab via CDP.
+        """
+        try:
+            await tab.send(cdp.emulation.set_script_execution_disabled(value=True))
+            logger.debug("JavaScript disabled for tab")
+        except Exception as exc:
+            logger.warning("Failed to disable JavaScript: %s", exc)
+
+    # ------------------------------------------------------------------
     # Cookie injection
     # ------------------------------------------------------------------
 
@@ -353,6 +370,10 @@ class ZendriverHtmlFetcher(HtmlFetcher):
         # We capture the HTML from the first (possibly redirect) response.
         html_result: list[str] = []
         done_event = asyncio.Event()
+
+        # Disable JavaScript if requested
+        if request.execute_javascript is False:
+            await self._disable_javascript(tab)
 
         async def handle_request_paused(event: cdp.fetch.RequestPaused) -> None:
             if done_event.is_set():

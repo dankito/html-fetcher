@@ -113,7 +113,7 @@ class CamoufoxHtmlFetcher(HtmlFetcher):
 
         context_kwargs: dict = {
             "viewport": {"width": 1920, "height": 1080},
-            "java_script_enabled": True,
+            "java_script_enabled": request.execute_javascript is not False,
         }
         # Honour a caller-supplied User-Agent by setting it as an extra header.
         # Camoufox already generates a realistic UA from the fingerprint bundle;

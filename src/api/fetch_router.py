@@ -41,6 +41,7 @@ async def fetch_get_html(
     cookies: Optional[list[str]] = Query(default=None, description="Cookies as 'name:value' pairs"),
     strategies: Optional[list[str]] = Query( default=None, description="Overwrite the default order ('curl-cffi,camoufox,zendriver') which fetch strategies to use like 'camoufox'"),
     load_lazy_content: bool = Query(default=False, description="Whether to scroll to the bottom before capturing HTML (resolves lazy-loaded elements)."),
+    execute_javascript: Optional[bool] = Query(default=None, description="Whether to execute JavaScript (None=default, True=skip curl-cffi, False=disable JS in browsers)."),
     service: FetchService = Depends(_get_service),
 ) -> HTMLResponse:
     request = FetchRequest(
@@ -51,6 +52,7 @@ async def fetch_get_html(
         cookies=_parse_cookie_pairs(cookies),
         strategies=_parse_strategies(strategies),
         load_lazy_content=load_lazy_content,
+        execute_javascript=execute_javascript,
     )
     result = await _do_fetch(service, request)
     return _to_html_response(result)
@@ -71,6 +73,7 @@ async def fetch_get_json(
     cookies: Optional[list[str]] = Query(default=None, description="Cookies as 'name:value' pairs"),
     strategies: Optional[list[str]] = Query( default=None, description="Overwrite the default order ('curl-cffi,camoufox,zendriver') which fetch strategies to use like 'camoufox'"),
     load_lazy_content: bool = Query(default=False, description="Whether to scroll to the bottom before capturing HTML (resolves lazy-loaded elements)."),
+    execute_javascript: Optional[bool] = Query(default=None, description="Whether to execute JavaScript (None=default, True=skip curl-cffi, False=disable JS in browsers)."),
     service: FetchService = Depends(_get_service),
 ) -> FetchResponse:
     request = FetchRequest(
@@ -81,6 +84,7 @@ async def fetch_get_json(
         cookies=_parse_cookie_pairs(cookies),
         strategies=_parse_strategies(strategies),
         load_lazy_content=load_lazy_content,
+        execute_javascript=execute_javascript,
     )
     result = await _do_fetch(service, request)
     return _to_fetch_response(result)

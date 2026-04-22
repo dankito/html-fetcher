@@ -12,6 +12,8 @@ services:
       - ROOT_PATH=/html-fetcher
       # the directory where camoufox, zendriver and cache data will be stored. Defaults to /data
       - DATA_DIR=/data
+      # Optional: disable Zendriver (AGPL-3.0 licensed) - uncomment to disable
+      #- FETCH_USE_ZENDRIVER=0
     volumes:
       - html_fetcher_data:/data
 

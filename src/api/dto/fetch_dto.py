@@ -40,6 +40,15 @@ class FetchRequest(BaseModel):
         default=False,
         description="Whether to scroll to the bottom before capturing HTML (resolves lazy-loaded elements).",
     )
+    execute_javascript: Optional[bool] = Field(
+        default=None,
+        description=(
+            "Whether to execute JavaScript during the fetch. "
+            "None (default): use default behaviour per strategy. "
+            "True: skip curl-cffi as it cannot execute JavaScript. "
+            "False: disable JavaScript execution in Camoufox/Zendriver."
+        ),
+    )
 
     @field_validator("strategies", mode="before")
     @classmethod
