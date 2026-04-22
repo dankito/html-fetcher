@@ -8,6 +8,7 @@ from pydantic import HttpUrl
 from src.model.fetch_result import FetchResult, FetchStrategy
 from src.api.dto.fetch_dto import FetchRequest, FetchResponse, parse_strategy_value
 from src.service.fetch_service import FetchService
+from src.service.html_sanitizer_service import HtmlSanitizerService
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/fetch", tags=["fetch"])
@@ -16,6 +17,8 @@ router = APIRouter(prefix="/fetch", tags=["fetch"])
 def _get_service() -> FetchService:
     """Resolved by the app-level dependency override at startup."""
     raise NotImplementedError
+
+htmlSanitizer = HtmlSanitizerService()
 
 
 # ---------------------------------------------------------------------------
@@ -158,21 +161,12 @@ async def _do_fetch(service: FetchService, request: FetchRequest):
         raise HTTPException(status_code=502, detail=str(exc)) from exc
 
 def _to_html_response(result: FetchResult) -> HTMLResponse:
-    return HTMLResponse(content=_inject_base_tag(result.html, result.final_url))
+    return HTMLResponse(content=htmlSanitizer.clean_html(result))
 
 def _to_fetch_response(result: FetchResult) -> FetchResponse:
     return FetchResponse(
-        html=_inject_base_tag(result.html, result.final_url),
+        html=htmlSanitizer.clean_html(result),
         status_code=result.status_code,
         final_url=result.final_url,
         strategy=result.strategy.value,
     )
-
-def _inject_base_tag(html: str, base_url: str) -> str:
-    """Inject <base href="base_url"> into <head> to fix relative URLs."""
-    base_tag = f'<base href="{base_url}">'
-    if "<head>" in html:
-        return html.replace("<head>", f"<head>{base_tag}", 1)
-    if "<html>" in html:
-        return html.replace("<html>", f"<html><head>{base_tag}</head>", 1)
-    return f"{base_tag}{html}"
