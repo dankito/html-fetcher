@@ -40,6 +40,7 @@ async def fetch_get_html(
     follow_redirects: bool = Query(default=True),
     cookies: Optional[list[str]] = Query(default=None, description="Cookies as 'name:value' pairs"),
     strategies: Optional[list[str]] = Query( default=None, description="Overwrite the default order ('curl-cffi,camoufox,zendriver') which fetch strategies to use like 'camoufox'"),
+    scroll_to_bottom: bool = Query(default=False, description="Whether to scroll to the bottom before capturing HTML (resolves lazy-loaded elements)."),
     service: FetchService = Depends(_get_service),
 ) -> HTMLResponse:
     request = FetchRequest(
@@ -49,6 +50,7 @@ async def fetch_get_html(
         follow_redirects=follow_redirects,
         cookies=_parse_cookie_pairs(cookies),
         strategies=_parse_strategies(strategies),
+        scroll_to_bottom=scroll_to_bottom,
     )
     result = await _do_fetch(service, request)
     return _to_html_response(result)
@@ -68,6 +70,7 @@ async def fetch_get_json(
     follow_redirects: bool = Query(default=True),
     cookies: Optional[list[str]] = Query(default=None, description="Cookies as 'name:value' pairs"),
     strategies: Optional[list[str]] = Query( default=None, description="Overwrite the default order ('curl-cffi,camoufox,zendriver') which fetch strategies to use like 'camoufox'"),
+    scroll_to_bottom: bool = Query(default=False, description="Whether to scroll to the bottom before capturing HTML (resolves lazy-loaded elements)."),
     service: FetchService = Depends(_get_service),
 ) -> FetchResponse:
     request = FetchRequest(
@@ -77,6 +80,7 @@ async def fetch_get_json(
         follow_redirects=follow_redirects,
         cookies=_parse_cookie_pairs(cookies),
         strategies=_parse_strategies(strategies),
+        scroll_to_bottom=scroll_to_bottom,
     )
     result = await _do_fetch(service, request)
     return _to_fetch_response(result)

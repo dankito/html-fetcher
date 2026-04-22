@@ -254,12 +254,13 @@ class ZendriverHtmlFetcher(HtmlFetcher):
 
             # 4. Navigate – with or without redirect following
             if not request.follow_redirects:
-                html = await self._fetch_no_redirect(tab, url)
+                html = await self._fetch_no_redirect(tab, url, request)
             else:
                 await tab.get(url)
                 # Brief human-like pause to let JS challenges settle
                 await self._human_simulation(tab)
-                await self._scroll_to_bottom(tab)
+                if request.scroll_to_bottom:
+                    await self._scroll_to_bottom(tab)
                 html = await tab.get_content()
 
             final_url = tab.url or url
@@ -299,9 +300,7 @@ class ZendriverHtmlFetcher(HtmlFetcher):
         patches survive navigations and are applied before any site script runs.
         """
         try:
-            await tab.send(
-                cdp.page.add_script_to_evaluate_on_new_document(_STEALTH_JS)
-            )
+            await tab.send(cdp.page.add_script_to_evaluate_on_new_document(_STEALTH_JS))
         except Exception as exc:
             logger.debug("addScriptToEvaluateOnNewDocument failed: %s", exc)
 
@@ -347,7 +346,9 @@ class ZendriverHtmlFetcher(HtmlFetcher):
     # No-redirect strategy
     # ------------------------------------------------------------------
 
-    async def _fetch_no_redirect(self, tab: zd.Tab, url: str) -> str:
+    async def _fetch_no_redirect(
+        self, tab: zd.Tab, url: str, request: FetchRequest
+    ) -> str:
         """
         Navigate to *url* but do not follow any HTTP redirects.
 
@@ -375,8 +376,7 @@ class ZendriverHtmlFetcher(HtmlFetcher):
             # If it's a redirect (3xx), capture the location and stop
             if 300 <= status < 400:
                 html_result.append(
-                    f"<html><body>Redirect to "
-                    f"{event.response_headers}</body></html>"
+                    f"<html><body>Redirect to {event.response_headers}</body></html>"
                 )
                 done_event.set()
                 try:
@@ -413,7 +413,8 @@ class ZendriverHtmlFetcher(HtmlFetcher):
 
             await tab.get(url)
             await self._human_simulation(tab)
-            await self._scroll_to_bottom(tab)
+            if request.scroll_to_bottom:
+                await self._scroll_to_bottom(tab)
             html = await tab.get_content()
 
         finally:
@@ -435,9 +436,7 @@ class ZendriverHtmlFetcher(HtmlFetcher):
         """
         try:
             # Determine total page height
-            page_height = await tab.evaluate(
-                "document.body.scrollHeight"
-            )
+            page_height = await tab.evaluate("document.body.scrollHeight")
             if not page_height:
                 return
 

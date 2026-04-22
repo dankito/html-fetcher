@@ -3,6 +3,7 @@ from typing import Optional, Union
 
 from src.model.fetch_result import FetchStrategy
 
+
 class FetchRequest(BaseModel):
     url: HttpUrl
     timeout: Optional[float] = Field(
@@ -35,6 +36,10 @@ class FetchRequest(BaseModel):
             'Example: ["camoufox", "zendriver"]'
         ),
     )
+    scroll_to_bottom: bool = Field(
+        default=False,
+        description="Whether to scroll to the bottom before capturing HTML (resolves lazy-loaded elements).",
+    )
 
     @field_validator("strategies", mode="before")
     @classmethod
@@ -59,7 +64,6 @@ class FetchResponse(BaseModel):
     status_code: int
     final_url: str
     strategy: str
-
 
 
 def parse_strategy_value(value: str) -> FetchStrategy:

@@ -125,6 +125,10 @@ class CamoufoxHtmlFetcher(HtmlFetcher):
 
             final_url = page.url
             status_code = response.status if response else 0
+
+            if request.scroll_to_bottom:
+                await self._scroll_to_bottom(page)
+
             html = await page.content()
         finally:
             await context.close()
@@ -142,6 +146,41 @@ class CamoufoxHtmlFetcher(HtmlFetcher):
             final_url=final_url,
             strategy=FetchStrategy.CAMOUFOX,
         )
+
+
+    async def _scroll_to_bottom(self, page) -> None:
+        """
+        Incrementally scroll to the bottom of the page so that lazy-loaded
+        elements (images, infinite scroll, etc.) are fully rendered before
+        the HTML is captured.
+        """
+        try:
+            viewport_height = 1080
+
+            async def get_page_height():
+                return await page.evaluate("document.body.scrollHeight")
+
+            page_height = await get_page_height()
+            if not page_height:
+                return
+
+            current_pos = 0
+
+            while current_pos < page_height:
+                current_pos = min(current_pos + viewport_height, page_height)
+                await page.evaluate(
+                    f"window.scrollTo({{top: {current_pos}, left: 0, behavior: 'smooth'}});"
+                )
+                await asyncio.sleep(random.uniform(0.2, 0.4))
+
+                new_height = await get_page_height()
+                if new_height and new_height > page_height:
+                    page_height = new_height
+
+            await asyncio.sleep(random.uniform(0.2, 0.5))
+
+        except Exception as exc:
+            logger.debug("Scroll-to-bottom failed (non-fatal): %s", exc)
 
 
 async def _goto_with_fallback(page, url: str, timeout_ms: float):
