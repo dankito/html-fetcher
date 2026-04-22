@@ -8,10 +8,6 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
     gnupg \
     ca-certificates \
-    && curl -fsSLo /usr/share/keyrings/brave-browser-archive-keyring.gpg https://brave-browser-apt-release.s3.brave.com/brave-browser-archive-keyring.gpg \
-    && echo "deb [signed-by=/usr/share/keyrings/brave-browser-archive-keyring.gpg] https://brave-browser-apt-release.s3.brave.com/ stable main"|tee /etc/apt/sources.list.d/brave-browser-release.list \
-    && apt-get update && apt-get install -y --no-install-recommends \
-    brave-browser \
     libgtk-3-0 \
     libdbus-glib-1-2 \
     libxt6 \
@@ -32,6 +28,11 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libpango-1.0-0 \
     libcairo2 \
     xvfb \
+    # install brave
+    && curl -fsSLo /usr/share/keyrings/brave-browser-archive-keyring.gpg https://brave-browser-apt-release.s3.brave.com/brave-browser-archive-keyring.gpg \
+    && echo "deb [signed-by=/usr/share/keyrings/brave-browser-archive-keyring.gpg] https://brave-browser-apt-release.s3.brave.com/ stable main"|tee /etc/apt/sources.list.d/brave-browser-release.list \
+    && apt-get update && apt-get install -y --no-install-recommends \
+    brave-browser \
     && rm -rf /var/lib/apt/lists/*
 
 # Create a non-root user
@@ -55,14 +56,16 @@ RUN uv sync --frozen --no-dev
 
 # Create a data directory for persistence and set permissions
 USER root
-RUN mkdir -p /data/camoufox /data/zendriver && chown -R fetcher:fetcher /data
+RUN mkdir -p /data/camoufox/cache /data/zendriver && chown -R fetcher:fetcher /data
 USER fetcher
 
 # Set environment variables for persistence
+ENV DATA_DIR=/data
 # Camoufox uses XDG_CACHE_HOME to find its binaries and profile by default via platformdirs
-ENV XDG_CACHE_HOME=/data
-ENV CAMOUFOX_DATA_DIR=/data/camoufox
-ENV ZENDRIVER_DATA_DIR=/data/zendriver
+ENV XDG_CACHE_HOME=${DATA_DIR}/cache
+ENV CAMOUFOX_DATA_DIR=${DATA_DIR}/camoufox
+ENV CAMOUFOX_CACHE_DIR=${CAMOUFOX_DATA_DIR}/cache
+ENV ZENDRIVER_DATA_DIR=${DATA_DIR}/zendriver
 
 # Default environment variables for the app
 ENV PORT=3330

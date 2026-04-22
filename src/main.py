@@ -15,6 +15,7 @@ from src.service.fetch_service import FetchService
 # ------------------------------------------------------------------
 # Configuration
 # ------------------------------------------------------------------
+PORT = int(os.environ.get("PORT", 3330))
 ROOT_PATH = os.environ.get("ROOT_PATH", "")
 
 logging.basicConfig(

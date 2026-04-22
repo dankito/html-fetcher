@@ -8,9 +8,10 @@ services:
     environment:
       - HOST=0.0.0.0
       - PORT=3330
+      # the URL path under which the service will be served. Defaults to "" (root path)
       - ROOT_PATH=/html-fetcher
-      - CAMOUFOX_DATA_DIR=/data/camoufox
-      - ZENDRIVER_DATA_DIR=/data/zendriver
+      # the directory where camoufox, zendriver and cache data will be stored. Defaults to /data
+      - DATA_DIR=/data
     volumes:
       - html_fetcher_data:/data
 

@@ -28,6 +28,7 @@ from __future__ import annotations
 
 import asyncio
 import os
+import socket
 import random
 import logging
 from urllib.parse import urlparse
@@ -35,6 +36,7 @@ from typing import Optional
 
 import zendriver as zd
 from zendriver import cdp
+from zendriver.core.config import AUTO
 
 from src.api.dto.fetch_dto import FetchRequest
 from src.client.html_fetcher import HtmlFetcher
@@ -97,7 +99,7 @@ _STEALTH_BROWSER_ARGS = [
 # avoids noisy zendriver logs
 
 # Suppress zendriver's verbose "starting" INFO banner
-logging.getLogger("zendriver.core.browser").setLevel(logging.WARNING)
+logging.getLogger("zendriver.core.browser").setLevel(logging.INFO)
 
 
 class ZendriverHtmlFetcher(HtmlFetcher):
@@ -220,21 +222,81 @@ class ZendriverHtmlFetcher(HtmlFetcher):
 
     async def _launch_browser(self) -> zd.Browser:
         """Start a Chromium instance with stealth flags."""
-        
+
         # Use ZENDRIVER_DATA_DIR for persistence if set
         data_dir = os.environ.get("ZENDRIVER_DATA_DIR")
         user_data_dir = os.path.join(data_dir, "user_data") if data_dir else None
-        
+
+        logger.info("ZENDRIVER_DATA_DIR=%s user_data_dir=%s", data_dir, user_data_dir)
+
+        if user_data_dir:
+            self._cleanup_stale_locks(user_data_dir)
+
         config = zd.Config(
             headless=True,
-            browser="brave", # other options: "chrome", "auto" (which is "chrome" on Linux)
+            browser="brave", # brave is installed in Docker container. Other options: "chrome", "auto" (which is "chrome" on Linux)
             browser_args=_STEALTH_BROWSER_ARGS,
-            user_data_dir=user_data_dir,
+            user_data_dir=user_data_dir if user_data_dir else AUTO,
             #lang="en-US", #seems to be a bug in zendriver that when setting it an exception gets thrown
         )
 
-        logger.info("Starting Zendriver browser with user_data_dir=%s", user_data_dir)
+        logger.info("Starting Zendriver browser with browser=%s user_data_dir=%s", config.browser_executable_path, user_data_dir)
         return await zd.start(config=config)
+
+    def _cleanup_stale_locks(self, profile_dir: str) -> None:
+        """
+        Remove stale lock files that prevent Chromium/Brave from starting.
+        This happens when the container/browser crashes and doesn't shut down cleanly.
+        """
+
+        if self._is_it_safe_to_remove_lock(profile_dir) or self._is_it_safe_to_remove_lock(os.path.join(profile_dir, "Default")):
+            # Common lock file locations in the user-data-dir
+            # Chrome/Brave use 'SingletonLock' (symlink on Linux)
+            # Some versions might also use 'SingletonCookie' or 'SingletonSocket'
+            lock_files = [
+                os.path.join(profile_dir, "SingletonLock"),
+                os.path.join(profile_dir, "SingletonCookie"),
+                os.path.join(profile_dir, "SingletonSocket"),
+                # For some profiles it might be inside 'Default'
+                os.path.join(profile_dir, "Default", "SingletonLock"),
+                os.path.join(profile_dir, "Default", "SingletonCookie"),
+                os.path.join(profile_dir, "Default", "SingletonSocket"),
+            ]
+
+            for lock_file in lock_files:
+                if os.path.exists(lock_file) or os.path.islink(lock_file):
+                    try:
+                        os.remove(lock_file)
+                    except Exception as exc:
+                        logger.warning("Failed to remove stale lock file %s: %s", lock_file, exc)
+
+    def _is_it_safe_to_remove_lock(self, profile_dir: str) -> bool:
+        lock_path = os.path.join(profile_dir, "SingletonLock")
+
+        try:
+            target = os.readlink(lock_path)  # e.g. "c4c515453905-162"
+            hostname, pid_str = target.rsplit("-", 1)
+            pid = int(pid_str)
+
+            if hostname != socket.gethostname():
+                # Lock is from a different host — safe to remove
+                return True
+            else:
+                # Same host: check if PID is alive
+                try:
+                    os.kill(pid, 0)
+                    # Process exists — do NOT remove locks
+                    return False
+                except ProcessLookupError:
+                    pass  # PID dead — safe to remove
+        except (FileNotFoundError, ValueError, OSError):
+            return False # No lock or unreadable — nothing to do
+
+        for f in ["SingletonLock", "SingletonSocket", "SingletonCookie"]:
+            try:
+                os.remove(os.path.join(profile_dir, f))
+            except FileNotFoundError:
+                pass
 
     # ------------------------------------------------------------------
     # Cookie injection
