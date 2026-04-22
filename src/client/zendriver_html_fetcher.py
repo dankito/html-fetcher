@@ -150,8 +150,48 @@ window.navigator.permissions.query = (parameters) =>
 """
 
 
+# avoids noisy zendriver logs
+
+# Suppress zendriver's verbose "starting" INFO banner
+logging.getLogger("zendriver.core.browser").setLevel(logging.WARNING)
+
+
 class ZendriverHtmlFetcher(HtmlFetcher):
-    """Fetch the rendered HTML of bot-protected pages using Zendriver."""
+    """
+    Fetch the rendered HTML of bot-protected pages using Zendriver.
+
+    The browser is started once and reused across all requests.
+    Each request opens its own tab, which is closed afterwards.
+    Call `await fetcher.start()` before use and `await fetcher.stop()` on
+    shutdown (or use it as an async context manager).
+    """
+
+    def __init__(self) -> None:
+        self._browser: Optional[zd.Browser] = None
+
+    # ------------------------------------------------------------------
+    # Lifecycle
+    # ------------------------------------------------------------------
+
+    async def start(self) -> None:
+        """Launch the shared browser instance."""
+        self._browser = await self._launch_browser()
+
+    async def stop(self) -> None:
+        """Shut down the shared browser instance."""
+        if self._browser is not None:
+            try:
+                await self._browser.stop()
+            except Exception:
+                pass
+            self._browser = None
+
+    async def __aenter__(self) -> "ZendriverHtmlFetcher":
+        await self.start()
+        return self
+
+    async def __aexit__(self, *_: object) -> None:
+        await self.stop()
 
     # ------------------------------------------------------------------
     # Public API
@@ -190,17 +230,27 @@ class ZendriverHtmlFetcher(HtmlFetcher):
     # ------------------------------------------------------------------
 
     async def _fetch_inner(self, request: FetchRequest, url: str) -> tuple[str, str]:
-        browser: Optional[zd.Browser] = None
+        if self._browser is None:
+            raise RuntimeError(
+                "ZendriverHtmlFetcher is not started. "
+                "Call `await fetcher.start()` first."
+            )
+
+        # Open a dedicated tab for this request; always close it afterwards
+        tab: Optional[zd.Tab] = None
         try:
-            browser = await self._launch_browser(request)
-            tab = browser.tabs[0]
+            tab = await self._browser.get(url, new_tab=True)
 
             # 1. Inject stealth JS overrides before any page script runs
             await self._inject_stealth_scripts(tab)
 
+            # 2. Apply per-request User-Agent override
+            if request.user_agent:
+                await tab.set_user_agent(request.user_agent)
+
             # 3. Inject cookies BEFORE navigation (e.g. DataDome token)
             if request.cookies:
-                await self._inject_cookies(browser, url, request.cookies)
+                await self._inject_cookies(self._browser, url, request.cookies)
 
             # 4. Navigate – with or without redirect following
             if not request.follow_redirects:
@@ -216,28 +266,26 @@ class ZendriverHtmlFetcher(HtmlFetcher):
             return html, final_url
 
         finally:
-            if browser is not None:
+            if tab is not None:
                 try:
-                    await browser.stop()
+                    await tab.close()
                 except Exception:
                     pass
 
     # ------------------------------------------------------------------
-    # Browser launch
+    # Browser launch (called once)
     # ------------------------------------------------------------------
 
-    async def _launch_browser(self, request: FetchRequest) -> zd.Browser:
-            """Start a Chromium instance with stealth flags."""
-            config = zd.Config(
-                headless=True,
-                browser="brave", # other options: "chrome", "auto" (which is "chrome" on Linux)
-                browser_args=_STEALTH_BROWSER_ARGS,
-                #lang="en-US", #seems to be a bug in zendriver that when setting it an exception gets thrown
-            )
-            if request.user_agent:
-                config.user_agent = request.user_agent
+    async def _launch_browser(self) -> zd.Browser:
+        """Start a Chromium instance with stealth flags."""
+        config = zd.Config(
+            headless=True,
+            browser="brave", # other options: "chrome", "auto" (which is "chrome" on Linux)
+            browser_args=_STEALTH_BROWSER_ARGS,
+            #lang="en-US", #seems to be a bug in zendriver that when setting it an exception gets thrown
+        )
 
-            return await zd.start(config=config)
+        return await zd.start(config=config)
 
     # ------------------------------------------------------------------
     # Stealth JS injection

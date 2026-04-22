@@ -38,11 +38,13 @@ async def live_service():
     camoufox = CamoufoxHtmlFetcher()
     await camoufox.start(headless=True)
     zendriver = ZendriverHtmlFetcher()
+    await zendriver.start()
 
     svc = FetchService(curl_client, camoufox, zendriver)
     yield svc
 
     await camoufox.stop()
+    await zendriver.stop()
 
 
 @pytest.mark.live

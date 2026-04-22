@@ -23,6 +23,7 @@ async def lifespan(app: FastAPI):
     camoufox_html_fetcher = CamoufoxHtmlFetcher()
     await camoufox_html_fetcher.start(headless=True)
     zendriver = ZendriverHtmlFetcher()
+    await zendriver.start()
 
     service = FetchService(curl_client, camoufox_html_fetcher, zendriver)
 
@@ -34,6 +35,7 @@ async def lifespan(app: FastAPI):
 
     # --- Shutdown ---
     await camoufox_html_fetcher.stop()
+    await zendriver.stop()
     logger.info("html-fetcher service stopped")
 
 
