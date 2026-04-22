@@ -83,7 +83,7 @@ ENV HOST=0.0.0.0
 COPY --chown=appuser:appuser src ./src
 
 # Expose the default port
-EXPOSE 3330
+EXPOSE ${PORT}
 
 # Run the application
 CMD ["sh", "-c", "uv run uvicorn src.main:app --host ${HOST} --port ${PORT}"]
