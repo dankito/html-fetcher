@@ -74,7 +74,6 @@ ENV HOST=0.0.0.0
 
 # Copy the rest of the application
 COPY --chown=fetcher:fetcher src ./src
-COPY --chown=fetcher:fetcher main.py ./
 
 # Expose the default port
 EXPOSE 3330
