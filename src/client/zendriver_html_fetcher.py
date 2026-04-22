@@ -50,10 +50,38 @@ _DEFAULT_UA = (
     "Chrome/124.0.0.0 Safari/537.36"
 )
 
+_viewport_height = 1080
+
 # ---------------------------------------------------------------------------
 # Chrome launch flags that strip away common automation fingerprints
 # ---------------------------------------------------------------------------
 _STEALTH_BROWSER_ARGS = [
+    # Original browser args:
+    # --remote-allow-origins=*
+    #     --no-first-run
+    #     --no-service-autorun
+    #     --no-default-browser-check
+    #     --homepage=about:blank
+    #     --no-pings
+    #     --password-store=basic
+    #     --disable-infobars
+    #     --disable-breakpad
+    #     --disable-component-update
+    #     --disable-backgrounding-occluded-windows
+    #     --disable-renderer-backgrounding
+    #     --disable-background-networking
+    #     --disable-dev-shm-usage
+    #     --disable-features=IsolateOrigins,DisableLoadExtensionCommandLineSwitch,site-per-process
+    #     --disable-session-crashed-bubble
+    #     --disable-search-engine-choice-screen
+    #     --user-data-dir=/tmp/uc_nx66uj6u
+    #     --disable-features=IsolateOrigins,site-per-process
+    #     --disable-session-crashed-bubble
+    #     --headless=new
+    #     --remote-debugging-host=127.0.0.1
+    #     --remote-debugging-port=38787
+    #     --webrtc-ip-handling-policy=disable_non_proxied_udp
+    #     --force-webrtc-ip-handling-policy
     "--no-sandbox",
     "--disable-setuid-sandbox",
     "--disable-dev-shm-usage",
@@ -76,7 +104,7 @@ _STEALTH_BROWSER_ARGS = [
     # Avoid GPU noise in headless/container environments
     "--disable-gpu",
     # Make window geometry look like a real laptop screen
-    "--window-size=1440,900",
+    f"--window-size=1920,{_viewport_height}",
     "--start-maximized",
     # Prevent WebRTC IP leaks (often fingerprinted)
     "--disable-webrtc-hw-encoding",
@@ -151,17 +179,17 @@ class ZendriverHtmlFetcher(HtmlFetcher):
         coro = self._fetch_inner(request, url)
 
         if timeout is not None:
-            html = await asyncio.wait_for(coro, timeout=timeout)
+            html, final_url = await asyncio.wait_for(coro, timeout=timeout)
         else:
-            html = await coro
+            html, final_url = await coro
 
-        return FetchResult(html, 200, url, FetchStrategy.ZENDRIVER)
+        return FetchResult(html, 200, final_url, FetchStrategy.ZENDRIVER)
 
     # ------------------------------------------------------------------
     # Internal helpers
     # ------------------------------------------------------------------
 
-    async def _fetch_inner(self, request: FetchRequest, url: str) -> str:
+    async def _fetch_inner(self, request: FetchRequest, url: str) -> tuple[str, str]:
         browser: Optional[zd.Browser] = None
         try:
             browser = await self._launch_browser(request)
@@ -181,9 +209,11 @@ class ZendriverHtmlFetcher(HtmlFetcher):
                 await tab.get(url)
                 # Brief human-like pause to let JS challenges settle
                 await self._human_simulation(tab)
+                await self._scroll_to_bottom(tab)
                 html = await tab.get_content()
 
-            return html
+            final_url = tab.url or url
+            return html, final_url
 
         finally:
             if browser is not None:
@@ -197,14 +227,17 @@ class ZendriverHtmlFetcher(HtmlFetcher):
     # ------------------------------------------------------------------
 
     async def _launch_browser(self, request: FetchRequest) -> zd.Browser:
-        """Start a Chromium instance with stealth flags."""
-        return await zd.start(
-            headless=True,
-            browser="brave", # other options: "chrome", "auto" (which is "chrome" on Linux)
-            browser_args=_STEALTH_BROWSER_ARGS,
-            user_agent = request.user_agent,
-            #lang="en-US",
-        )
+            """Start a Chromium instance with stealth flags."""
+            config = zd.Config(
+                headless=True,
+                browser="brave", # other options: "chrome", "auto" (which is "chrome" on Linux)
+                browser_args=_STEALTH_BROWSER_ARGS,
+                #lang="en-US", #seems to be a bug in zendriver that when setting it an exception gets thrown
+            )
+            if request.user_agent:
+                config.user_agent = request.user_agent
+
+            return await zd.start(config=config)
 
     # ------------------------------------------------------------------
     # Stealth JS injection
@@ -332,6 +365,7 @@ class ZendriverHtmlFetcher(HtmlFetcher):
 
             await tab.get(url)
             await self._human_simulation(tab)
+            await self._scroll_to_bottom(tab)
             html = await tab.get_content()
 
         finally:
@@ -341,6 +375,44 @@ class ZendriverHtmlFetcher(HtmlFetcher):
                 pass
 
         return html if not html_result else html_result[0]
+
+    # ------------------------------------------------------------------
+    # Scroll to bottom (resolves lazy-loaded elements)
+    # ------------------------------------------------------------------
+    async def _scroll_to_bottom(self, tab: zd.Tab) -> None:
+        """
+        Incrementally scroll to the bottom of the page so that lazy-loaded
+        elements (images, infinite scroll, etc.) are fully rendered before
+        the HTML is captured.
+        """
+        try:
+            # Determine total page height
+            page_height = await tab.evaluate(
+                "document.body.scrollHeight"
+            )
+            if not page_height:
+                return
+
+            current_pos = 0
+
+            while current_pos < page_height:
+                current_pos = min(current_pos + _viewport_height, page_height)
+                await tab.evaluate(
+                    f"window.scrollTo({{top: {current_pos}, left: 0, behavior: 'smooth'}});"
+                )
+                # Wait for lazy-load triggers to fire
+                await asyncio.sleep(random.uniform(0.2, 0.4))
+
+                # Re-check height in case new content extended the page
+                new_height = await tab.evaluate("document.body.scrollHeight")
+                if new_height and new_height > page_height:
+                    page_height = new_height
+
+            # Brief pause at the bottom before content is captured
+            await asyncio.sleep(random.uniform(0.2, 0.5))
+
+        except Exception as exc:
+            logger.debug("Scroll-to-bottom failed (non-fatal): %s", exc)
 
     # ------------------------------------------------------------------
     # Human behaviour simulation
