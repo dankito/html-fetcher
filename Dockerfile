@@ -35,12 +35,17 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     brave-browser \
     && rm -rf /var/lib/apt/lists/*
 
-# Create a non-root user
-RUN groupadd -r fetcher && useradd -r -g fetcher -G audio,video fetcher \
-    && mkdir -p /home/fetcher && chown -R fetcher:fetcher /home/fetcher \
-    && mkdir -p /app && chown -R fetcher:fetcher /app
 
-USER fetcher
+# Create a non-root user with explicit UID/GID matching host user
+ARG UID=1000
+ARG GID=1000
+
+RUN groupadd -r -g ${GID} appuser \
+    && useradd -r -u ${UID} -g appuser -G audio,video appuser \
+    && mkdir -p /home/appuser && chown -R appuser:appuser /home/appuser \
+    && mkdir -p /app && chown -R appuser:appuser /app
+
+USER appuser
 
 # Set working directory
 WORKDIR /app
@@ -49,15 +54,15 @@ WORKDIR /app
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
 
 # Copy dependency files
-COPY --chown=fetcher:fetcher pyproject.toml uv.lock ./
+COPY --chown=appuser:appuser pyproject.toml uv.lock ./
 
 # Install dependencies
 RUN uv sync --frozen --no-dev
 
 # Create a data directory for persistence and set permissions
 USER root
-RUN mkdir -p /data/camoufox/cache /data/zendriver && chown -R fetcher:fetcher /data
-USER fetcher
+RUN mkdir -p /data/camoufox/cache /data/zendriver && chown -R appuser:appuser /data
+USER appuser
 
 # Set environment variables for persistence
 ENV DATA_DIR=/data
@@ -73,7 +78,7 @@ ENV ROOT_PATH=""
 ENV HOST=0.0.0.0
 
 # Copy the rest of the application
-COPY --chown=fetcher:fetcher src ./src
+COPY --chown=appuser:appuser src ./src
 
 # Expose the default port
 EXPOSE 3330
