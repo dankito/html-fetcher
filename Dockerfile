@@ -59,10 +59,6 @@ COPY --chown=appuser:appuser pyproject.toml uv.lock ./
 # Install dependencies
 RUN uv sync --frozen --no-dev
 
-# Create a data directory for persistence and set permissions
-USER root
-RUN mkdir -p /data/camoufox/cache /data/zendriver && chown -R appuser:appuser /data
-USER appuser
 
 # Set environment variables for persistence
 ENV DATA_DIR=/data
@@ -71,6 +67,12 @@ ENV XDG_CACHE_HOME=${DATA_DIR}/cache
 ENV CAMOUFOX_DATA_DIR=${DATA_DIR}/camoufox
 ENV CAMOUFOX_CACHE_DIR=${CAMOUFOX_DATA_DIR}/cache
 ENV ZENDRIVER_DATA_DIR=${DATA_DIR}/zendriver
+
+# Create a data directory for persistence and set permissions
+USER root
+RUN mkdir -p ${DATA_DIR} ${XDG_CACHE_HOME} ${CAMOUFOX_DATA_DIR} ${CAMOUFOX_CACHE_DIR} ${ZENDRIVER_DATA_DIR}  \
+    && chown -R appuser:appuser ${DATA_DIR}
+USER appuser
 
 # Default environment variables for the app
 ENV PORT=3330
