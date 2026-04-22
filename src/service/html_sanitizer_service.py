@@ -5,6 +5,7 @@ class HtmlSanitizerService:
 
     def clean_html(self, result: FetchResult) -> str:
         html = self._inject_base_tag(result.html, result.final_url)
+        html = self._restore_body_scrollability(html)
 
         return html
 
@@ -17,3 +18,15 @@ class HtmlSanitizerService:
         if "<html>" in html:
             return html.replace("<html>", f"<html><head>{base_tag}</head>", 1)
         return f"{base_tag}{html}"
+
+    def _restore_body_scrollability(self, html: str) -> str:
+        """Fixes that some sites rendered with Camoufox prevent scrolling the body."""
+        style_tag = """<style>
+    body {
+        overflow: auto !important;
+        position: static !important;
+    }
+    </style>"""
+        if "</body>" in html:
+            return html.replace("</body>", f"{style_tag}</body>", 1)
+        return f"{html}{style_tag}"
