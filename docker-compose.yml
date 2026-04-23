@@ -1,6 +1,7 @@
 services:
   html-fetcher:
-    build: .
+    #build: .
+    image: ghcr.io/dankito/html-fetcher:latest
     container_name: html-fetcher
     restart: unless-stopped
     ports:
