@@ -76,6 +76,8 @@ RUN mkdir -p ${DATA_DIR} ${XDG_CACHE_HOME} ${CAMOUFOX_DATA_DIR} ${CAMOUFOX_CACHE
 USER appuser
 
 # Default environment variables for the app
+ARG VERSION=unknown
+ENV APP_VERSION=${VERSION}
 ENV PORT=3330
 ENV ROOT_PATH=""
 ENV HOST=0.0.0.0

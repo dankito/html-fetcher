@@ -7,7 +7,8 @@ from src.model.app_config import AppConfig
 class AppConfigParser:
 
     def parse_app_config(self) -> AppConfig:
-        version = __version__
+        app_version= self._str_or_none("APP_VERSION") # to be able to override app version via environment variable
+        version = app_version if app_version is not None else __version__
 
         return AppConfig(
             port=self._int("PORT", 3330),
