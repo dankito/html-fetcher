@@ -28,6 +28,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libpango-1.0-0 \
     libcairo2 \
     xvfb \
+    gosu \
     # install brave
     && curl -fsSLo /usr/share/keyrings/brave-browser-archive-keyring.gpg https://brave-browser-apt-release.s3.brave.com/brave-browser-archive-keyring.gpg \
     && echo "deb [signed-by=/usr/share/keyrings/brave-browser-archive-keyring.gpg] https://brave-browser-apt-release.s3.brave.com/ stable main"|tee /etc/apt/sources.list.d/brave-browser-release.list \
@@ -84,6 +85,13 @@ COPY --chown=appuser:appuser src ./src
 
 # Expose the default port
 EXPOSE ${PORT}
+
+# add script to fix file permissions
+USER root
+COPY docker/entrypoint.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
+# Note: keep USER root here so entrypoint can fix perms, then drop to appuser in entrypoint
+ENTRYPOINT ["/entrypoint.sh"]
 
 # Run the application
 CMD ["sh", "-c", "uv run uvicorn src.main:app --host ${HOST} --port ${PORT}"]

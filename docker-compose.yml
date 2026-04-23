@@ -14,6 +14,9 @@ services:
       - DATA_DIR=/data
       # Optional: disable Zendriver (AGPL-3.0 licensed) - uncomment to disable
       #- USE_ZENDRIVER=true
+      # Optional: set permissions for data directory to user/group of host user (e.g. for easier backups); defaults to 1000:1000
+      #- UID=1000
+      #- GID=1000
     volumes:
       - html_fetcher_data:/data
 
