@@ -10,3 +10,5 @@ class AppConfig:
     
     use_zendriver: bool = True
     zendriver_data_dir: str | None = None
+
+    version: str = "unknown"

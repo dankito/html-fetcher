@@ -12,3 +12,5 @@ wheels/
 # IDEs
 .idea/
 *.iml
+
+src/_version.py

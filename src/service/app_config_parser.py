@@ -1,4 +1,5 @@
 import os
+from _version import __version__
 
 from src.model.app_config import AppConfig
 
@@ -6,6 +7,8 @@ from src.model.app_config import AppConfig
 class AppConfigParser:
 
     def parse_app_config(self) -> AppConfig:
+        version = __version__
+
         return AppConfig(
             port=self._int("PORT", 3330),
             root_path=self._str("ROOT_PATH", ""),
@@ -14,6 +17,7 @@ class AppConfigParser:
 
             use_zendriver=self._bool_default_true("USE_ZENDRIVER"),
             zendriver_data_dir=self._str_or_none("ZENDRIVER_DATA_DIR"),
+            version=version,
         )
 
 

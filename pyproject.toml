@@ -1,7 +1,11 @@
+[build-system]
+requires = ["setuptools>=69", "setuptools-scm>=8"]
+build-backend = "setuptools.build_meta"
+
 [project]
 name = "html-fetcher"
-version = "0.1.0"
-description = "Add your description here"
+dynamic = ["version"]  # tell setuptools the version comes from elsewhere
+description = "Retrieves web page HTML while bypassing common bot detection systems including Cloudfront, Cloudflare, Akamai, and select DataDome configurations"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
@@ -12,6 +16,10 @@ dependencies = [
     "uvicorn>=0.44.0",
     "zendriver>=0.15.3",
 ]
+
+[tool.setuptools_scm]
+fallback_version = "0.0.0-dev"
+write_to = "src/_version.py"   # auto-generated file
 
 [dependency-groups]
 dev = [

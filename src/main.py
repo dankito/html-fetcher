@@ -27,7 +27,7 @@ async def lifespan(app: FastAPI):
     # Wire the service into the dependency injection system.
     app.dependency_overrides[_get_service] = lambda: service
 
-    logger.info("html-fetcher service ready (port=%d, root_path=%s)", config.port, config.root_path)
+    logger.info("html-fetcher service ready (port=%d, root_path=%s, version=%s)", config.port, config.root_path, config.version)
     yield
 
     # --- Shutdown ---
@@ -42,7 +42,7 @@ app = FastAPI(
         "curl_cffi (Chrome TLS impersonation) first, "
         "Camoufox headless/headed browser as last resort."
     ),
-    version="0.1.0",
+    version=config.version,
     lifespan=lifespan,
     root_path=config.root_path,
 )
