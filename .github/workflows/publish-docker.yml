@@ -9,7 +9,6 @@ on:
       version:
         description: 'Version tag (e.g. 1.2.3)'
         required: true
-        default: 'latest'
 
 env:
   REGISTRY: ghcr.io
