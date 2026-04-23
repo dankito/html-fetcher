@@ -18,7 +18,7 @@ dependencies = [
 ]
 
 [tool.setuptools_scm]
-fallback_version = "0.0.0-dev"
+fallback_version = "0.5.0"
 write_to = "src/_version.py"   # auto-generated file
 
 [dependency-groups]
