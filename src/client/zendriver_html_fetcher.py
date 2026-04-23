@@ -96,10 +96,7 @@ _STEALTH_BROWSER_ARGS = [
 ]
 
 
-# avoids noisy zendriver logs
-
-# Suppress zendriver's verbose "starting" INFO banner
-logging.getLogger("zendriver.core.browser").setLevel(logging.INFO)
+zendriver_browser_logger = logging.getLogger("zendriver.core.browser")
 
 
 class ZendriverHtmlFetcher(HtmlFetcher):
@@ -244,7 +241,11 @@ class ZendriverHtmlFetcher(HtmlFetcher):
         )
 
         logger.info("Starting Zendriver browser with browser=%s user_data_dir=%s", config.browser_executable_path, user_data_dir)
-        return await zd.start(config=config)
+        # Suppress zendriver's verbose "starting" INFO log; uncomment if zendriver startup fails
+        zendriver_browser_logger.setLevel(logging.WARNING)
+        browser = await zd.start(config=config)
+        zendriver_browser_logger.setLevel(logging.INFO)
+        return browser
 
     def _cleanup_stale_locks(self, profile_dir: str) -> None:
         """
