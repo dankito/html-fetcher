@@ -85,15 +85,15 @@ For a full example see [docker-compose.yml](./docker-compose.yml) in the project
 
 ### Endpoint Overview
 
-| Method | Path            | Response | Description                                   |
-|--------|-----------------|----------|-----------------------------------------------|
-| GET    | `/fetch`        | HTML     | Fetch HTML, returns raw HTML                  |
-| GET    | `/fetch`        | JSON     | Fetch HTML, returns JSON envelope             |
-| POST   | `/fetch`        | HTML     | Fetch HTML (JSON body), returns raw HTML      |
-| POST   | `/fetch`        | JSON     | Fetch HTML (JSON body), returns JSON envelope |
-| GET    | `/openapi.json` | JSON     | OpenAPI endpoints documentation               |
-| GET    | `/docs`         | HTML     | Swagger-UI                                    |
-| GET    | `/health`       | JSON     | Health check                                  |
+| Method | Path            | Response | Description                                             |
+|--------|-----------------|----------|---------------------------------------------------------|
+| GET    | `/fetch`        | JSON     | Fetch HTML, returns JSON envelope (default)             |
+| GET    | `/fetch`        | HTML     | Fetch HTML, returns raw HTML                            |
+| POST   | `/fetch`        | JSON     | Fetch HTML (JSON body), returns JSON envelope (default) |
+| POST   | `/fetch`        | HTML     | Fetch HTML (JSON body), returns raw HTML                |
+| GET    | `/openapi.json` | JSON     | OpenAPI endpoints documentation                         |
+| GET    | `/docs`         | HTML     | Swagger-UI                                              |
+| GET    | `/health`       | JSON     | Health check                                            |
 
 ### Query Parameters
 
@@ -117,13 +117,51 @@ Note: The response format is determined via content negotiation using the `Accep
 
 ### Examples
 
-#### GET — Raw HTML
+#### GET — JSON Envelope (Default)
 
 <details>
 <summary><strong>cURL</strong></summary>
 
 ```bash
 curl "http://localhost:3330/fetch?url=https://example.com"
+```
+
+</details>
+
+<details>
+<summary><strong>JavaScript (fetch API)</strong></summary>
+
+```javascript
+const response = await fetch("http://localhost:3330/fetch?url=https://example.com");
+const data = await response.json();
+console.log(data);
+// { html: "...", status_code: 200, final_url: "https://example.com", strategy: "curl-cffi" }
+```
+
+</details>
+
+<details>
+<summary><strong>Python (requests)</strong></summary>
+
+```python
+import requests
+
+response = requests.get("http://localhost:3330/fetch", params={"url": "https://example.com"})
+print(response.json())
+# {'html': '...', 'status_code': 200, 'final_url': 'https://example.com', 'strategy': 'curl-cffi'}
+```
+
+</details>
+
+---
+
+#### GET — Raw HTML
+
+<details>
+<summary><strong>cURL</strong></summary>
+
+```bash
+curl -H "Accept: text/html" "http://localhost:3330/fetch?url=https://example.com"
 ```
 
 </details>
@@ -152,15 +190,11 @@ print(response.text)
 
 </details>
 
----
-
-#### GET — JSON Envelope
-
 <details>
 <summary><strong>cURL</strong></summary>
 
 ```bash
-curl -H "Accept: application/json" "http://localhost:3330/fetch?url=https://example.com"
+curl -H "Accept: text/html" "http://localhost:3330/fetch?url=https://example.com"
 ```
 
 </details>
@@ -170,11 +204,10 @@ curl -H "Accept: application/json" "http://localhost:3330/fetch?url=https://exam
 
 ```javascript
 const response = await fetch("http://localhost:3330/fetch?url=https://example.com", {
-  headers: { "Accept": "application/json" }
+  headers: { "Accept": "text/html" }
 });
-const data = await response.json();
-console.log(data);
-// { html: "...", status_code: 200, final_url: "https://example.com", strategy: "curl-cffi" }
+const html = await response.text();
+console.log(html);
 ```
 
 </details>
@@ -188,10 +221,9 @@ import requests
 response = requests.get(
     "http://localhost:3330/fetch",
     params={"url": "https://example.com"},
-    headers={"Accept": "application/json"}
+    headers={"Accept": "text/html"}
 )
-print(response.json())
-# {'html': '...', 'status_code': 200, 'final_url': 'https://example.com', 'strategy': 'curl-cffi'}
+print(response.text)
 ```
 
 </details>
@@ -223,7 +255,9 @@ const response = await fetch("http://localhost:3330/fetch", {
     strategies: ["camoufox"]
   })
 });
-console.log(await response.text());
+const data = await response.json();
+console.log(data);
+// { html: "...", status_code: 200, final_url: "https://example.com", strategy: "camoufox" }
 ```
 
 </details>
@@ -238,7 +272,8 @@ response = requests.post("http://localhost:3330/fetch", json={
     "url": "https://example.com",
     "strategies": ["camoufox"]
 })
-print(response.text)
+print(response.json())
+# {'html': '...', 'status_code': 200, 'final_url': 'https://example.com', 'strategy': 'camoufox'}
 ```
 
 </details>
@@ -270,7 +305,9 @@ const response = await fetch("http://localhost:3330/fetch", {
     cookies: { datadome: "abc123DefGh" }
   })
 });
-console.log(await response.text());
+const data = await response.json();
+console.log(data);
+// { html: "...", status_code: 200, final_url: "https://example.com", strategy: "curl-cffi" }
 ```
 
 </details>
@@ -285,7 +322,8 @@ response = requests.post("http://localhost:3330/fetch", json={
     "url": "https://example.com",
     "cookies": {"datadome": "abc123DefGh"}
 })
-print(response.text)
+print(response.json())
+# {'html': '...', 'status_code': 200, 'final_url': 'https://example.com', 'strategy': 'curl-cffi'}
 ```
 
 </details>
