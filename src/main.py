@@ -27,7 +27,7 @@ async def lifespan(app: FastAPI):
     # Wire the service into the dependency injection system.
     app.dependency_overrides[_get_service] = lambda: service
 
-    logger.info("html-fetcher service ready (port=%d, root_path=%s, version=%s)", config.port, config.root_path, config.version)
+    logger.info("html-fetcher service ready (port=%d, root_path=%s, version=%s, commit_id=%s)", config.port, config.root_path, config.version, config.commit_id)
     yield
 
     # --- Shutdown ---

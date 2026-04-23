@@ -12,3 +12,4 @@ class AppConfig:
     zendriver_data_dir: str | None = None
 
     version: str = "unknown"
+    commit_id: str | None = None

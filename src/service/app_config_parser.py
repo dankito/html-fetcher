@@ -1,5 +1,5 @@
 import os
-from _version import __version__
+from _version import version, commit_id
 
 from src.model.app_config import AppConfig
 
@@ -7,8 +7,8 @@ from src.model.app_config import AppConfig
 class AppConfigParser:
 
     def parse_app_config(self) -> AppConfig:
-        app_version= self._str_or_none("APP_VERSION") # to be able to override app version via environment variable
-        version = app_version if app_version is not None else __version__
+        env_var = self._str_or_none("APP_VERSION") # to be able to override app version via environment variable
+        app_version = env_var if env_var is not None else version.split("+")[0]
 
         return AppConfig(
             port=self._int("PORT", 3330),
@@ -18,7 +18,8 @@ class AppConfigParser:
 
             use_zendriver=self._bool_default_true("USE_ZENDRIVER"),
             zendriver_data_dir=self._str_or_none("ZENDRIVER_DATA_DIR"),
-            version=version,
+            version=app_version,
+            commit_id=commit_id
         )
 
 
