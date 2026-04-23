@@ -25,6 +25,37 @@ htmlSanitizer = HtmlSanitizerService()
 # GET  /fetch?url=...&timeout=...&user_agent=...&follow_redirects=...
 # ---------------------------------------------------------------------------
 
+# returns the fetched HTML as JSON object of type FetchResponse
+@router.get(
+    "",
+    response_model=FetchResponse,
+    summary="Fetch HTML — returns JSON envelope",
+    operation_id="fetch_json_get",
+)
+async def fetch_get_json(
+    url: HttpUrl = Query(...),
+    timeout: Optional[float] = Query(default=None, gt=0),
+    user_agent: Optional[str] = Query(default=None),
+    follow_redirects: bool = Query(default=True),
+    cookies: Optional[list[str]] = Query(default=None, description="Cookies as 'name:value' pairs"),
+    strategies: Optional[list[str]] = Query( default=None, description="Overwrite the default order ('curl-cffi,camoufox,zendriver') which fetch strategies to use like 'camoufox'"),
+    load_lazy_content: bool = Query(default=False, description="Whether to scroll to the bottom before capturing HTML (resolves lazy-loaded elements)."),
+    execute_javascript: Optional[bool] = Query(default=None, description="Whether to execute JavaScript (None=default, True=skip curl-cffi, False=disable JS in browsers)."),
+    service: FetchService = Depends(_get_service),
+) -> FetchResponse:
+    request = FetchRequest(
+        url=url,
+        timeout=timeout,
+        user_agent=user_agent,
+        follow_redirects=follow_redirects,
+        cookies=_parse_cookie_pairs(cookies),
+        strategies=_parse_strategies(strategies),
+        load_lazy_content=load_lazy_content,
+        execute_javascript=execute_javascript,
+    )
+    result = await _do_fetch(service, request)
+    return _to_fetch_response(result)
+
 # returns the fetched HTML directly
 @router.get(
     "",
@@ -58,41 +89,23 @@ async def fetch_get_html(
     return _to_html_response(result)
 
 
-# returns the fetched HTML as JSON object of type FetchResponse
-@router.get(
-    "",
-    response_model=FetchResponse,
-    summary="Fetch HTML — returns JSON envelope",
-    operation_id="fetch_json_get",
-)
-async def fetch_get_json(
-    url: HttpUrl = Query(...),
-    timeout: Optional[float] = Query(default=None, gt=0),
-    user_agent: Optional[str] = Query(default=None),
-    follow_redirects: bool = Query(default=True),
-    cookies: Optional[list[str]] = Query(default=None, description="Cookies as 'name:value' pairs"),
-    strategies: Optional[list[str]] = Query( default=None, description="Overwrite the default order ('curl-cffi,camoufox,zendriver') which fetch strategies to use like 'camoufox'"),
-    load_lazy_content: bool = Query(default=False, description="Whether to scroll to the bottom before capturing HTML (resolves lazy-loaded elements)."),
-    execute_javascript: Optional[bool] = Query(default=None, description="Whether to execute JavaScript (None=default, True=skip curl-cffi, False=disable JS in browsers)."),
-    service: FetchService = Depends(_get_service),
-) -> FetchResponse:
-    request = FetchRequest(
-        url=url,
-        timeout=timeout,
-        user_agent=user_agent,
-        follow_redirects=follow_redirects,
-        cookies=_parse_cookie_pairs(cookies),
-        strategies=_parse_strategies(strategies),
-        load_lazy_content=load_lazy_content,
-        execute_javascript=execute_javascript,
-    )
-    result = await _do_fetch(service, request)
-    return _to_fetch_response(result)
-
-
 # ---------------------------------------------------------------------------
 # POST /fetch   body: FetchRequest JSON
 # ---------------------------------------------------------------------------
+
+# returns the fetched HTML as JSON object of type FetchResponse
+@router.post(
+    "",
+    response_model=FetchResponse,
+    summary="Fetch HTML — returns JSON envelope",
+    operation_id="fetch_json",
+)
+async def fetch_post_json(
+    body: FetchRequest,
+    service: FetchService = Depends(_get_service),
+) -> FetchResponse:
+    result = await _do_fetch(service, body)
+    return _to_fetch_response(result)
 
 # returns the fetched HTML directly
 @router.post(
@@ -108,21 +121,6 @@ async def fetch_post_html(
 ) -> HTMLResponse:
     result = await _do_fetch(service, body)
     return _to_html_response(result)
-
-
-# returns the fetched HTML as JSON object of type FetchResponse
-@router.post(
-    "",
-    response_model=FetchResponse,
-    summary="Fetch HTML — returns JSON envelope",
-    operation_id="fetch_json",
-)
-async def fetch_post_json(
-    body: FetchRequest,
-    service: FetchService = Depends(_get_service),
-) -> FetchResponse:
-    result = await _do_fetch(service, body)
-    return _to_fetch_response(result)
 
 
 # ---------------------------------------------------------------------------
