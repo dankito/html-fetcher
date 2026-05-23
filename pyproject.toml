@@ -15,6 +15,7 @@ dependencies = [
     "pydantic>=2.13.3",
     "uvicorn>=0.45.0",
     "zendriver>=0.15.3",
+    "prometheus-fastapi-instrumentator>=7.1.0",
 ]
 
 [tool.setuptools_scm]

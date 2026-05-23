@@ -8,6 +8,7 @@ from fastapi import FastAPI, Request, Response
 from src.api.fetch_router import router as fetch_router, _get_service
 from src.service.app_config_parser import AppConfigParser
 from src.service.fetch_service import FetchService
+from prometheus_fastapi_instrumentator import Instrumentator
 
 
 logging.basicConfig(
@@ -48,6 +49,8 @@ app = FastAPI(
 )
 
 app.include_router(fetch_router)
+
+Instrumentator().instrument(app).expose(app, tags=["Metrics"])
 
 
 # ------------------------------------------------------------------

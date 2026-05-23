@@ -330,6 +330,15 @@ print(response.json())
 
 ---
 
+### `GET /metrics`
+Prometheus metrics endpoint.
+
+```bash
+curl http://localhost:8001/metrics
+```
+
+---
+
 #### Health Check
 
 <details>
