@@ -19,7 +19,7 @@ services:
       #- UID=1000
       #- GID=1000
     volumes:
-      - html_fetcher_data:/data
+      - ./data:/data
 
 volumes:
   html_fetcher_data:
