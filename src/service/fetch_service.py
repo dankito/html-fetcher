@@ -1,5 +1,6 @@
 import logging
 
+from service.js_wall_detector_service import JsWallDetectorService
 from src.api.dto.fetch_dto import FetchRequest
 from src.client.camoufox_html_fetcher import CamoufoxHtmlFetcher
 from src.client.curl_cffi_html_fetcher import CurlCffiHtmlFetcher
@@ -31,6 +32,9 @@ class FetchService(HtmlFetcher):
     (e.g., [FetchStrategy.CAMOUFOX, FetchStrategy.CURL_CFFI]).
     Otherwise, uses the default order (curl_cffi, then camoufox).
     """
+
+    _js_detection_service = JsWallDetectorService()
+
 
     @classmethod
     async def from_config(cls, config: AppConfig) -> "FetchService":
@@ -77,10 +81,14 @@ class FetchService(HtmlFetcher):
         if not self._should_skip_curl_cffi(request):
             try:
                 result = await self._curl.fetch(request)
-                if result.status_code not in _REJECTION_CODES:
-                    return result
 
-                logger.warning("curl_cffi got rejection status %d for %s; escalating to Camoufox", result.status_code, request.url_str)
+                needs_js = self._js_detection_service.needs_javascript(result.html)
+                if needs_js.needs_js:
+                    logger.info(f"Result indicates JS is required: {needs_js.reason}. Skipping curl-cffi")
+                elif result.status_code in _REJECTION_CODES:
+                    logger.warning("curl_cffi got rejection status %d for %s; escalating to Camoufox", result.status_code, request.url_str)
+                else:
+                    return result
             except Exception as exc:
                 logger.warning("curl_cffi failed for %s (%s); escalating to Camoufox", request.url_str, exc)
 
@@ -118,15 +126,14 @@ class FetchService(HtmlFetcher):
                 else:
                     continue
 
-                if result.status_code not in _REJECTION_CODES:
+                needs_js = self._js_detection_service.needs_javascript(result.html)
+                if needs_js.needs_js:
+                    logger.info(f"Result indicates JS is required: {needs_js.reason}. Skipping {strategy.value} strategy")
+                elif result.status_code not in _REJECTION_CODES:
+                    logger.warning("%s got rejection status %d for %s; escalating to next strategy",
+                               strategy.value, result.status_code, request.url_str)
+                else:
                     return result
-
-                logger.warning(
-                    "%s got rejection status %d for %s; escalating to next strategy",
-                    strategy.value,
-                    result.status_code,
-                    request.url_str,
-                )
             except Exception as exc:
                 logger.exception(
                     "%s failed for %s (%s); escalating to next strategy",
