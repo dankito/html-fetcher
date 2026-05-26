@@ -78,21 +78,29 @@ class CamoufoxHtmlFetcher(HtmlFetcher):
         data_dir = os.environ.get("CAMOUFOX_DATA_DIR")
 
         if data_dir:
+            # for options see playwright.firefox.launch_persistent_context() in .venv/lib/python3.12/site-packages/playwright/async_api/_generated.py
             browser = AsyncCamoufox(
                 headless=headless,
                 humanize=True,
                 block_webrtc=True,
                 os=target_os,
+                viewport={"width": 1920, "height": self._viewport_height},
+                java_script_enabled = True,
                 persistent_context=True,
+                # Path to a User Data Directory, which stores browser session data like cookies and local storage.
+                # Pass an empty string to create a temporary directory.
                 user_data_dir=data_dir,
             )
         else:
+            # for options playwright.firefox.launch() in .venv/lib/python3.12/site-packages/playwright/async_api/_generated.py
             browser = AsyncCamoufox(
                 headless=headless,
                 humanize=True,
                 block_webrtc=True,
                 os=target_os,
             )
+            logger.info("Launched a non-persistent context, viewport and java_script_enabled cannot be set there.")
+
         self._browser = await browser.start()
         logger.info("Camoufox browser ready (headless=%s, os=%s)", headless, target_os)
 
