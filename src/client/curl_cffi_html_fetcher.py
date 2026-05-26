@@ -75,7 +75,7 @@ class CurlCffiHtmlFetcher(HtmlFetcher):
             status_code=response.status_code,
             final_url=str(response.url),
             strategy=FetchStrategy.CURL_CFFI,
-            http_version=response.http_version,
+            http_version=str(response.http_version), # fixes bug that sometimes it's an int like '3'
             headers=dict(response.headers),
             cookies=dict(response.cookies),
             elapsed_microseconds=int(response.elapsed.total_seconds() * 1_000_000),

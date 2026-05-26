@@ -175,7 +175,7 @@ def _to_fetch_response(result: FetchResult) -> FetchResponse:
         status_code=result.status_code,
         final_url=result.final_url,
         strategy=result.strategy.value,
-        http_version=result.http_version,
+        http_version=str(result.http_version),
         headers=result.headers,
         cookies=result.cookies,
         elapsed_microseconds=result.elapsed_microseconds,
