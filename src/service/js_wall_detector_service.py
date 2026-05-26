@@ -57,6 +57,58 @@ class JsWallDetectorService:
         re.IGNORECASE | re.DOTALL,
     )
 
+
+    def needs_javascript(self, html: str) -> JsDetectionResult:
+        """
+        Analyse a web response and decide whether JS enabled browsers like Camoufox or Zendriver should take over.
+        Returns a JsDetectionResult with needs_js=True and a human-readable reason if so.
+        """
+
+        body = self._extract_body(html)
+        lower_html = html.lower()
+        lower_body = body.lower()
+
+        # 1. Suspiciously small payload
+        if len(html.strip()) < 512:
+            return JsDetectionResult(html, body, True, f"Payload too small")
+
+        # 2. Explicit "enable JavaScript" message in visible text: body + title (not full head)
+        title_m = re.search(r"<title[^>]*>(.*?)</title>", html, re.IGNORECASE | re.DOTALL)
+        title = title_m.group(1).lower() if title_m else ""
+        for phrase in self.JS_REQUIRED_PHRASES:
+            if phrase in lower_body or phrase in title:
+                return JsDetectionResult(html, body, True, f"JS-required phrase: '{phrase}'")
+
+        # 3. <noscript> block that redirects or replaces the whole page: body only
+        noscript_redirect_match = self.NOSCRIPT_REDIRECT_PATTERN.search(body)
+        if noscript_redirect_match:
+            return JsDetectionResult(html, body, True, "<noscript> redirect detected", noscript_redirect_match.string)
+
+        # 4. Known bot-challenge / JS-challenge fingerprints whole HTML
+        for pattern in self.JS_CHALLENGE_PATTERNS:
+            match = re.search(pattern, lower_html, re.IGNORECASE)
+            if match:
+                return JsDetectionResult(html, body, True, f"JS challenge: '{pattern}'", match.string)
+
+        # 5. Empty shell SPA containers: body only
+        for pattern in self.EMPTY_SHELL_PATTERNS:
+            match = re.search(pattern, body, re.IGNORECASE)
+            if match:
+                return JsDetectionResult(html, body, True, f"Empty shell: '{pattern}'", match.string)
+
+        # 6. Content-to-markup ratio is very low (lots of tags, almost no text): body only
+        ratio = self._text_content_ratio(body)
+        if ratio < 0.04:
+            return JsDetectionResult(html, body, True, f"Text/HTML ratio too low ({ratio:.2%})")
+
+        return JsDetectionResult(html, body, False, None)
+
+
+    def _extract_body(self, html: str) -> str:
+        """Return content between <body> tags, or full html if not found."""
+        m = re.search(r"<body[^>]*>(.*?)</body>", html, re.IGNORECASE | re.DOTALL)
+        return m.group(1) if m else html
+
     def _text_content_ratio(self, html: str) -> float:
         """Rough ratio of visible text to total HTML length."""
         text = re.sub(r"<[^>]+>", "", html)  # strip tags
@@ -64,42 +116,3 @@ class JsWallDetectorService:
         if not html:
             return 0.0
         return len(text) / len(html)
-
-
-    def needs_javascript(self, html: str) -> JsDetectionResult:
-        """
-        Analyse a web response and decide whether JS enabled browsers like Camoufox or Zendriver should take over.
-        Returns a JsDetectionResult with needs_js=True and a human-readable reason if so.
-        """
-        lower = html.lower()
-        html_len = len(html.strip())
-
-        # 1. Suspiciously small payload
-        if html_len < 512:
-            return JsDetectionResult(html, True, f"Payload too small ({html_len} bytes)")
-
-        # 2. Explicit "enable JavaScript" message in visible text
-        for phrase in self.JS_REQUIRED_PHRASES:
-            if phrase in lower:
-                return JsDetectionResult(html, True, f"JS-required phrase found: '{phrase}'")
-
-        # 3. <noscript> block that redirects or replaces the whole page
-        if self.NOSCRIPT_REDIRECT_PATTERN.search(html):
-            return JsDetectionResult(html, True, "<noscript> redirect detected")
-
-        # 4. Known bot-challenge / JS-challenge fingerprints
-        for pattern in self.JS_CHALLENGE_PATTERNS:
-            if re.search(pattern, html, re.IGNORECASE):
-                return JsDetectionResult(html, True, f"JS challenge fingerprint: '{pattern}'")
-
-        # 5. Empty shell SPA containers
-        for pattern in self.EMPTY_SHELL_PATTERNS:
-            if re.search(pattern, html, re.IGNORECASE):
-                return JsDetectionResult(html, True, f"Empty shell pattern: '{pattern}'")
-
-        # 6. Content-to-markup ratio is very low (lots of tags, almost no text)
-        ratio = self._text_content_ratio(html)
-        if ratio < 0.04:  # less than 4 % is actual text
-            return JsDetectionResult(html, True, f"Text/HTML ratio too low ({ratio:.2%})")
-
-        return JsDetectionResult(html, False, None)
