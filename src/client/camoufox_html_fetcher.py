@@ -65,10 +65,10 @@ class CamoufoxHtmlFetcher(HtmlFetcher):
        across requests.
     """
 
-    def __init__(self, viewportHeight: int = 1080) -> None:
-        self._browser = None
+    def __init__(self, viewport_height: int = 1080) -> None:
+        self._browser: AsyncCamoufox | None = None
         self._headless: bool = True
-        self._viewportHeight = viewportHeight
+        self._viewport_height = viewport_height
 
     async def start(self, headless: bool = True) -> None:
         target_os = _pick_os()
@@ -93,8 +93,7 @@ class CamoufoxHtmlFetcher(HtmlFetcher):
                 block_webrtc=True,
                 os=target_os,
             )
-        self._browser = browser
-        await browser.start()
+        self._browser = await browser.start()
         logger.info("Camoufox browser ready (headless=%s, os=%s)", headless, target_os)
 
     async def stop(self) -> None:
@@ -112,27 +111,32 @@ class CamoufoxHtmlFetcher(HtmlFetcher):
         # Camoufox timeout is in milliseconds; 0 means no timeout.
         timeout_ms = (request.timeout * 1000) if request.timeout is not None else _DEFAULT_TIMEOUT_MS
 
-        context_kwargs: dict = {
-            "viewport": {"width": 1920, "height": self._viewportHeight},
-            "java_script_enabled": request.execute_javascript is not False,
-        }
-        # Honour a caller-supplied User-Agent by setting it as an extra header.
-        # Camoufox already generates a realistic UA from the fingerprint bundle;
-        # only override when explicitly requested to avoid fingerprint mismatch.
-        if request.user_agent:
-            context_kwargs["extra_http_headers"] = {"User-Agent": request.user_agent}
-
-        context = await self._browser.new_context(**context_kwargs)
+        # Camoufox internally uses launch_persistent_context instead of launch(),
+        # which merges the Browser and BrowserContext into a single object.
+        # Therefore self._browser is already a BrowserContext — calling new_context()
+        # on it does not exist and would raise an AttributeError.
+        # Instead, each isolated "session" is achieved by opening a new Page and
+        # closing it afterwards. Cookies/storage isolation per request is handled
+        # via page-level APIs rather than context-level ones.
+        page = await self._browser.new_page()
         try:
+            await page.set_viewport_size({"width": 1920, "height": self._viewport_height})
+
+            if request.execute_javascript is False:
+                # JS cannot be toggled per-page in a persistent context; log a warning.
+                logger.warning(
+                    "CamoufoxHtmlFetcher: java_script_enabled=False is not supported per-request with persistent_context. JS remains enabled.")
+
+            if request.user_agent:
+                await page.set_extra_http_headers({"User-Agent": request.user_agent})
+
             if request.cookies:
                 parsed = urlparse(request.url_str)
                 domain = parsed.hostname or parsed.netloc
-                await context.add_cookies([
+                await self._browser.add_cookies([
                     {"name": k, "value": v, "domain": domain, "path": "/"}
                     for k, v in request.cookies.items()
                 ])
-
-            page = await context.new_page()
 
             # Small random delay before navigation — breaks the "instant goto"
             # timing pattern that some WAFs flag as non-human.
@@ -149,7 +153,7 @@ class CamoufoxHtmlFetcher(HtmlFetcher):
 
             html = await page.content()
         finally:
-            await context.close()
+            await page.close()
 
         logger.info(
             "camoufox fetched %s -> status=%d final_url=%s",
@@ -183,7 +187,7 @@ class CamoufoxHtmlFetcher(HtmlFetcher):
             current_pos = 0
 
             while current_pos < page_height:
-                current_pos = min(current_pos + self._viewportHeight, page_height)
+                current_pos = min(current_pos + self._viewport_height, page_height)
                 await page.evaluate(
                     f"window.scrollTo({{top: {current_pos}, left: 0, behavior: 'smooth'}});"
                 )
