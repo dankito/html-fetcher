@@ -127,7 +127,7 @@ class FetchService(HtmlFetcher):
                     continue
 
                 needs_js = self._js_detection_service.needs_javascript(result.html)
-                if needs_js.needs_js:
+                if needs_js.needs_js and strategies.index(strategy) != len(strategies) - 1: # only go to next fetcher if there are fetchers left
                     logger.info(f"Result indicates JS is required: {needs_js.reason} ({needs_js.matched_html[:100] if needs_js.matched_html else needs_js.body[:100]}...). Skipping curl-cffi")
                 elif result.status_code in _REJECTION_CODES:
                     logger.warning("%s got rejection status %d for %s; escalating to next strategy",
