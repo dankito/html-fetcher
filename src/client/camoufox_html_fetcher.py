@@ -112,6 +112,7 @@ class CamoufoxHtmlFetcher(HtmlFetcher):
                 logger.warning("Error closing Camoufox browser: %s", exc)
         logger.info("Camoufox browser stopped")
 
+
     async def fetch(self, request: FetchRequest) -> FetchResult:
         if self._browser is None:
             raise RuntimeError("CamoufoxHtmlFetcher not started; call start() first")
@@ -154,7 +155,7 @@ class CamoufoxHtmlFetcher(HtmlFetcher):
             response = await _goto_with_fallback(page, request.url_str, timeout_ms)
 
             final_url = page.url
-            status_code = response.status if response else 0
+            cookies = await page.context.cookies(request.url_str)
 
             if request.load_lazy_content:
                 await self._scroll_to_bottom(page)
@@ -163,6 +164,7 @@ class CamoufoxHtmlFetcher(HtmlFetcher):
         finally:
             await page.close()
 
+        status_code = response.status if response else 0
         logger.info(
             "camoufox fetched %s -> status=%d final_url=%s",
             request.url_str,
@@ -175,6 +177,11 @@ class CamoufoxHtmlFetcher(HtmlFetcher):
             status_code=status_code,
             final_url=final_url,
             strategy=FetchStrategy.CAMOUFOX,
+            # getting the http version would be very complicated by observing network connections like `client.on("Network.responseReceived", handle_response_received)`
+            headers=dict(response.headers),
+            # TODO: parse cookies
+            # cookies=dict(cookies),
+            elapsed_microseconds=int(total_ms * 1_000),
         )
 
 
@@ -211,6 +218,7 @@ class CamoufoxHtmlFetcher(HtmlFetcher):
             logger.debug("Scroll-to-bottom failed (non-fatal): %s", exc)
 
 
+# returns a Response object from playwright .venv/lib/python3.12/site-packages/playwright/_impl/_network.py
 async def _goto_with_fallback(page, url: str, timeout_ms: float):
     """
     Try to navigate with 'networkidle' first (best for JS-heavy pages).

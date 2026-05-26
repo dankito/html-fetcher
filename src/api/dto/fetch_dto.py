@@ -73,6 +73,10 @@ class FetchResponse(BaseModel):
     status_code: int
     final_url: str
     strategy: str
+    http_version: str | None = None
+    headers: dict[str, str] | None = None
+    cookies: dict[str, str] | None = None
+    elapsed_microseconds: int | None = None
 
 
 def parse_strategy_value(value: str) -> FetchStrategy:

@@ -75,4 +75,8 @@ class CurlCffiHtmlFetcher(HtmlFetcher):
             status_code=response.status_code,
             final_url=str(response.url),
             strategy=FetchStrategy.CURL_CFFI,
+            http_version=response.http_version,
+            headers=dict(response.headers),
+            cookies=dict(response.cookies),
+            elapsed_microseconds=int(response.elapsed.total_seconds() * 1_000_000),
         )

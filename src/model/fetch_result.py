@@ -14,3 +14,7 @@ class FetchResult:
     status_code: int
     final_url: str
     strategy: FetchStrategy
+    http_version: str | None = None
+    headers: dict[str, str] | None = None
+    cookies: dict[str, str] | None = None
+    elapsed_microseconds: int | None = None

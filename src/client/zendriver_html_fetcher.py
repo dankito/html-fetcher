@@ -31,6 +31,8 @@ import os
 import socket
 import random
 import logging
+import time
+from dataclasses import dataclass, field
 from urllib.parse import urlparse
 from typing import Optional
 
@@ -97,6 +99,17 @@ _STEALTH_BROWSER_ARGS = [
 
 
 zendriver_browser_logger = logging.getLogger("zendriver.core.browser")
+# silence Zendriver's "KeyError: ('privateNetworkRequestPolicy',)  during parsing of json from event" logs
+logging.getLogger("uc.connection").setLevel(logging.WARNING)
+
+
+@dataclass
+class ResponseMeta:
+    headers: dict = field(default_factory=dict)
+    cookies: list = field(default_factory=list)
+    http_version: Optional[str] = None
+    elapsed_ms: Optional[float] = None
+    status: Optional[int] = None
 
 
 class ZendriverHtmlFetcher(HtmlFetcher):
@@ -162,17 +175,18 @@ class ZendriverHtmlFetcher(HtmlFetcher):
         coro = self._fetch_inner(request, url)
 
         if timeout is not None:
-            html, final_url = await asyncio.wait_for(coro, timeout=timeout)
+            html, final_url, meta = await asyncio.wait_for(coro, timeout=timeout)
         else:
-            html, final_url = await coro
+            html, final_url, meta = await coro
 
-        return FetchResult(html, 200, final_url, FetchStrategy.ZENDRIVER)
+        return FetchResult(html, 200, final_url, FetchStrategy.ZENDRIVER, meta.http_version,
+                           meta.headers, None, int(meta.elapsed_ms * 1_000)) # TODO: map cookies
 
     # ------------------------------------------------------------------
     # Internal helpers
     # ------------------------------------------------------------------
 
-    async def _fetch_inner(self, request: FetchRequest, url: str) -> tuple[str, str]:
+    async def _fetch_inner(self, request: FetchRequest, url: str) -> tuple[str, str, ResponseMeta]:
         if self._browser is None:
             raise RuntimeError(
                 "ZendriverHtmlFetcher is not started. "
@@ -195,6 +209,31 @@ class ZendriverHtmlFetcher(HtmlFetcher):
             if request.cookies:
                 await self._inject_cookies(self._browser, url, request.cookies)
 
+            # Enable CDP Network domain
+            await tab.send(zd.cdp.network.enable())
+
+            meta = ResponseMeta()
+            nav_start: Optional[float] = None
+            response_received = asyncio.Event()
+
+            async def on_request_will_be_sent(event: zd.cdp.network.RequestWillBeSent):
+                nonlocal nav_start
+                if event.request.url == url and nav_start is None:
+                    nav_start = time.monotonic()
+
+            async def on_response_received(event: zd.cdp.network.ResponseReceived):
+                if event.response.url == url:
+                    r = event.response
+                    meta.status = r.status
+                    meta.headers = dict(r.headers)
+                    meta.http_version = r.protocol  # e.g. "h2", "http/1.1"
+                    if nav_start is not None:
+                        meta.elapsed_ms = (time.monotonic() - nav_start) * 1000
+                    response_received.set()
+
+            tab.add_handler(zd.cdp.network.RequestWillBeSent, on_request_will_be_sent)
+            tab.add_handler(zd.cdp.network.ResponseReceived, on_response_received)
+
             # 3. Navigate – with or without redirect following
             if not request.follow_redirects:
                 html = await self._fetch_no_redirect(tab, url, request)
@@ -206,8 +245,21 @@ class ZendriverHtmlFetcher(HtmlFetcher):
                     await self._scroll_to_bottom(tab)
                 html = await tab.get_content()
 
+            # Wait for response meta (with timeout)
+            try:
+                await asyncio.wait_for(response_received.wait(), timeout=5.0)
+            except asyncio.TimeoutError:
+                pass  # meta stays partially filled
+
+            # Fetch cookies via CDP
+            cookie_result = await tab.send(zd.cdp.network.get_cookies([url]))
+            meta.cookies = [
+                {"name": c.name, "value": c.value, "domain": c.domain, "path": c.path}
+                for c in (cookie_result or [])
+            ]
+
             final_url = tab.url or url
-            return html, final_url
+            return html, final_url, meta
 
         finally:
             if tab is not None:
