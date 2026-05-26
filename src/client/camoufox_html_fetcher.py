@@ -172,6 +172,9 @@ class CamoufoxHtmlFetcher(HtmlFetcher):
             final_url,
         )
 
+        timing = response.request.timing
+        total_ms = timing["responseEnd"] - timing["domainLookupStart"]
+
         return FetchResult(
             html=html,
             status_code=status_code,
