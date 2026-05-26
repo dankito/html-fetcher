@@ -21,18 +21,12 @@ class JsWallDetectorService:
     ]
 
     EMPTY_SHELL_PATTERNS = [
-        # Empty or near-empty body
         r"<body[^>]*>\s*</body>",
-        r"<body[^>]*>\s*<script",  # body starts immediately with a script
+        r"<body[^>]*>\s*<script",
         r"<body[^>]*>\s*<noscript",
-
-        # React / Vue / Angular mount points with nothing inside
         r'<div[^>]+id=["\']app["\'][^>]*>\s*</div>',
         r'<div[^>]+id=["\']root["\'][^>]*>\s*</div>',
         r'<div[^>]+id=["\']main["\'][^>]*>\s*</div>',
-
-        # Loader spinners / skeleton screens
-        r'class=["\'][^"\']*(?:loading|spinner|skeleton)[^"\']*["\']',
     ]
 
     JS_CHALLENGE_PATTERNS = [
@@ -52,11 +46,6 @@ class JsWallDetectorService:
         r'<meta[^>]+http-equiv=["\']refresh["\']',  # instant meta-refresh = suspicious
     ]
 
-    NOSCRIPT_REDIRECT_PATTERN = re.compile(
-        r"<noscript[^>]*>.*?<meta[^>]+(?:refresh|redirect)|<a[^>]+href.*?</noscript>",
-        re.IGNORECASE | re.DOTALL,
-    )
-
 
     def needs_javascript(self, html: str) -> JsDetectionResult:
         """
@@ -66,39 +55,37 @@ class JsWallDetectorService:
 
         body = self._extract_body(html)
         lower_html = html.lower()
-        lower_body = body.lower()
 
         # 1. Suspiciously small payload
         if len(html.strip()) < 512:
-            return JsDetectionResult(html, body, True, f"Payload too small")
+            return JsDetectionResult(html, body, True, "Payload too small")
 
-        # 2. Explicit "enable JavaScript" message in visible text: body + title (not full head)
+        # 2. JS-required phrases — noscript blocks + title only, NOT full body text
         title_m = re.search(r"<title[^>]*>(.*?)</title>", html, re.IGNORECASE | re.DOTALL)
         title = title_m.group(1).lower() if title_m else ""
+        noscript_blocks = re.findall(r"<noscript[^>]*>(.*?)</noscript>", body, re.IGNORECASE | re.DOTALL)
+        lower_noscript = " ".join(noscript_blocks).lower()
         for phrase in self.JS_REQUIRED_PHRASES:
-            if phrase in lower_body or phrase in title:
+            if phrase in title or phrase in lower_noscript:
                 return JsDetectionResult(html, body, True, f"JS-required phrase: '{phrase}'")
 
-        # 3. <noscript> block that redirects or replaces the whole page: body only
-        noscript_redirect_match = self.NOSCRIPT_REDIRECT_PATTERN.search(body)
-        if noscript_redirect_match:
-            return JsDetectionResult(html, body, True, "<noscript> redirect detected", noscript_redirect_match.string)
+        # 3. <noscript> redirect REMOVED — too broad, GTM/analytics use this pattern legitimately
 
-        # 4. Known bot-challenge / JS-challenge fingerprints whole HTML
+        # 4. Known bot-challenge / JS-challenge fingerprints — whole HTML
         for pattern in self.JS_CHALLENGE_PATTERNS:
-            match = re.search(pattern, lower_html, re.IGNORECASE)
+            match = re.search(pattern, lower_html)
             if match:
-                return JsDetectionResult(html, body, True, f"JS challenge: '{pattern}'", match.string)
+                return JsDetectionResult(html, body, True, f"JS challenge: '{pattern}'")
 
-        # 5. Empty shell SPA containers: body only
+        # 5. Empty shell SPA containers — empty #app/#root divs only, spinner class REMOVED
         for pattern in self.EMPTY_SHELL_PATTERNS:
             match = re.search(pattern, body, re.IGNORECASE)
             if match:
-                return JsDetectionResult(html, body, True, f"Empty shell: '{pattern}'", match.string)
+                return JsDetectionResult(html, body, True, f"Empty shell: '{pattern}'")
 
-        # 6. Content-to-markup ratio is very low (lots of tags, almost no text): body only
+        # 6. Text/HTML ratio — raised threshold, only fires when extremely low
         ratio = self._text_content_ratio(body)
-        if ratio < 0.04:
+        if ratio < 0.02:
             return JsDetectionResult(html, body, True, f"Text/HTML ratio too low ({ratio:.2%})")
 
         return JsDetectionResult(html, body, False, None)
