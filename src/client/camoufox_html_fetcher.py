@@ -85,7 +85,7 @@ class CamoufoxHtmlFetcher(HtmlFetcher):
                 block_webrtc=True,
                 os=target_os,
                 viewport={"width": 1920, "height": self._viewport_height},
-                java_script_enabled = True,
+                java_script_enabled=True,
                 persistent_context=True,
                 # Path to a User Data Directory, which stores browser session data like cookies and local storage.
                 # Pass an empty string to create a temporary directory.
@@ -99,7 +99,11 @@ class CamoufoxHtmlFetcher(HtmlFetcher):
                 block_webrtc=True,
                 os=target_os,
             )
-            logger.info("Launched a non-persistent context, viewport and java_script_enabled cannot be set there.")
+            async with browser as playwright_browser:
+                await playwright_browser.new_context(
+                    viewport={"width": 1920, "height": self._viewport_height},
+                    java_script_enabled=True,
+                )
 
         self._browser = await browser.start()
         logger.info("Camoufox browser ready (headless=%s, os=%s)", headless, target_os)
