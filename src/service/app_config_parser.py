@@ -1,5 +1,5 @@
 import os
-from _version import version, commit_id
+from src._version import version, commit_id
 
 from src.model.app_config import AppConfig
 
