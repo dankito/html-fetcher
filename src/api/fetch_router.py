@@ -58,7 +58,7 @@ async def fetch_get_json(
 
 # returns the fetched HTML directly
 @router.get(
-    "",
+    "/html",
     response_class=HTMLResponse,
     responses={200: {"content": {"text/html": {}}, "description": "Raw HTML of the fetched page"}},
     summary="Fetch HTML — returns raw HTML",
@@ -109,7 +109,7 @@ async def fetch_post_json(
 
 # returns the fetched HTML directly
 @router.post(
-    "",
+    "/html",
     response_class=HTMLResponse,
     responses={200: {"content": {"text/html": {}}, "description": "Raw HTML of the fetched page"}},
     summary="Fetch HTML — returns raw HTML",
