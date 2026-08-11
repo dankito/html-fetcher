@@ -65,26 +65,30 @@ _access_logger = logging.getLogger("access")
 
 @app.middleware("http")
 async def access_log_middleware(request: Request, call_next):
-    start = time.perf_counter()
-    response: Response = await call_next(request)
+    try:
+        start = time.perf_counter()
+        response: Response = await call_next(request)
 
-    # do not log access to /metrics and /health endpoints
-    if request.url.path != "/metrics" and request.url.path != "/health":
-        duration_ms = (time.perf_counter() - start) * 1000
+        # do not log access to /metrics and /health endpoints
+        if request.url.path != "/metrics" and request.url.path != "/health":
+            duration_ms = (time.perf_counter() - start) * 1000
 
-        client = f"{request.client.host}:{request.client.port}" if request.client else "-"
-        _access_logger.info(
-            '%s - "%s %s HTTP/%s" %s %s %.1fms',
-            client,
-            request.method,
-            request.url.path + (f"?{request.url.query}" if request.url.query else ""),
-            request.scope.get("http_version", "1.1"),
-            response.status_code,
-            http.HTTPStatus(response.status_code).phrase,
-            duration_ms,
-        )
+            client = f"{request.client.host}:{request.client.port}" if request.client else "-"
+            _access_logger.info(
+                '%s - "%s %s HTTP/%s" %s %s %.1fms',
+                client,
+                request.method,
+                request.url.path + (f"?{request.url.query}" if request.url.query else ""),
+                request.scope.get("http_version", "1.1"),
+                response.status_code,
+                http.HTTPStatus(response.status_code).phrase,
+                duration_ms,
+            )
 
-    return response
+        return response
+    except Exception as e:
+        logger.exception("Error in access log middleware: %s", e, exc_info=True)
+        raise e
 
 
 @app.get("/health", tags=["ops"])
